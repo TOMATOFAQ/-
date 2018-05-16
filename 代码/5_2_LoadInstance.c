@@ -4,15 +4,18 @@
 
 int *** I;
 int n,m;
-
 int printInformation();
 int LoadInstance();
+/********************新代码********************/
+
 
 int main(){
     LoadInstance();
     printInformation();
 }
 
+
+/********************新代码********************/
 int printInformation(){
     int i,j;
     printf("工件信息：(机器号，所需时间)\n");    
@@ -22,6 +25,7 @@ int printInformation(){
         printf("\n");
     }
 }
+
 
 int LoadInstance(){
     /*补充对I的说明：
