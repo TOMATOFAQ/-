@@ -11,7 +11,6 @@ int LoadInstance();
 int main(){
     LoadInstance();
     printInformation();
-    /*...其他代码...*/
 }
 
 int printInformation(){
@@ -19,15 +18,15 @@ int printInformation(){
     printf("工件信息：(机器号，所需时间)\n");    
     for(i=0;i<n;i++){
         printf("工件%2d 所需工序:",i);
-        for(j=0;j<m;j++)    printf("(%d,%d) ",I[i][j][0],I[i][j][1]);
+        for(j=0;j<m;j++)    if(I[i][j][0]) printf("(%2d,%2d),",I[i][j][0],I[i][j][1]);
         printf("\n");
     }
 }
 
 int LoadInstance(){
     /*补充对I的说明：
-    I[i][j][0] 表示第i个工件第j个工序所需要的机器,若值为-1，说明不存在这个工序
-    I[i][j][1] 表示第i个工件第j个工序所需要的时间,若值为-1，说明不存在这个工序
+    I[i][j][0] 表示第i个工件第j个工序所需要的机器,若值为0，说明不存在这个工序
+    I[i][j][1] 表示第i个工件第j个工序所需要的时间,若值为0，说明不存在这个工序
     */
     
     freopen("input.txt","r",stdin);//默认重定向输入至input.txt，如果需要手动输入请注释改行或者修改输入文件
@@ -39,10 +38,7 @@ int LoadInstance(){
         I[i] = (int **)malloc(sizeof(int*)*m);
         for(j=0;j<m;j++){
             I[i][j] = (int *)malloc(sizeof(int)*2);
-            for(k=0;k<2;k++){
-                I[i][j][k] = -1;
-                //-1表示不存在这个工序
-            }
+            memset(I[i][j],0,sizeof(I[i][j]));//0表示不存在这个工序
         }
     }
 
