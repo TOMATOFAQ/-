@@ -3,19 +3,307 @@
 #include <string.h>
 #include <time.h>
 
-#define ps 10 //种群大小 
-#define mit 10 //迭代次数 
-int *** I;
-int n, m;
+//需要人为调参的量: 
+#define ps 5 //种群大小 population size
+#define mit 3 //迭代次数 mount for iteratior
+#define pc 0 //交配概率 probability for crossover
+#define pm 0 //突变概率 probability for mutation
+
+int *** I;//录入信息 
+int n, m;//工件数,机器数 
+int length = 0; //染色体长度 
+
+typedef struct GRAPH{//有向图的结构之节点
+    struct NODE * children;
+}graph;
+typedef struct NODE{//有向图的结构之节点
+    int * son;
+}node;
+graph G;
+int * st;//一条打乱的染色体 
+
+int * Ct;//存放每道工序开始加工的时间
+
+/********************************* 1-Input *************************************/ 
 void printInformation();
 void LoadInstance();
+/********************************* 2-InitPopulation ********************************/ 
+void shuffle(int * gene);
+int ** InitPopulation(); 
+void displaypop(int ** pop,int * eachtime);
+/********************************* 3-ComputDAG *************************************/ 
+void ComputeDAG(int * s);
+int ComputeStartTimes(int * s);
+/********************************* 4-Crossover *************************************/ 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MIN(a,b) ((a)<(b)?(a):(b)) 
+int ** Index(int * p);
+void printfIndex(int ** idx);
+void printfparent(int * p);
+int * Crossover(int * p1,int *p2);
+void * Mutation(int * p);
+/********************************* 5-iterator *************************************/ 
+void shufflepop(int * eachtime,int ** pop);
+void sortpop(int * eachtime,int ** pop);
+int iterator(int ** pop,int * eachtime);
+/********************************* 6-Output *************************************/ 
+void FormatSolution_and_display(int * s,int * C){//这里不应该用全局变量
 
-int findlen(int * a){
-	return sizeof(a)/sizeof(int);
+    int i,j,k;
+    int * T = (int *)malloc(sizeof(int)*n);
+    memset(T,0,sizeof(int)*n);
+
+    int ** S = (int **)malloc(sizeof(int *)*n);
+    for(i=0;i<n;i++){
+        S[i] = (int *)malloc(sizeof(int)*m);
+        memset(S[i],0,sizeof(int)*m);
+    }
+
+    for(i=0;i<length;i++){
+        int j = s[i];//获得实际工件号
+        int t = T[j-1];//获得这是第j个工件的第t个工序
+        S[j-1][t] = Ct[i]; //第j-1个工件的第t个工序的开始时间
+        T[j-1] = T[j-1] + 1
+		;
+    }
+	
+    //S中存放的是每道工序开始加工的时间，它的形式为：[[a,b,c],[d,e,f],[g,h,i]],每个子list代表一个工件的信息，子list中的字母代表这个工件下面每道工序开始加工的时间。 
+
+	int *** result = (int ***)malloc(sizeof(int**)*m);//第i台机器
+	for(i=0;i<m;i++){
+		result[i] = (int **)malloc(sizeof(int*)*n);//第i台机器的第j个工序
+		for(j=0;j<n;j++){
+			result[i][j] = (int *)malloc(sizeof(int)*4);//第i台机器的第j个工序所对应工件的序号,和这个工件的所在工序,以及开始时间,终止时间
+			memset(result[i][j],-1,sizeof(int)*4);//-1表示没访问过
+		}
+	}
+	//result这个数组里面,对于每一台机器.需要知道占用的时间.被占用的机器.如果机器是只在加工时间里加工一次的话,那么就不需要知道是第几次了,搜索即可.//算了,还是顺便存上好了.
+
+	//展示原数据s
+	printf("s:");
+	for(i=0;i<length;i++){
+		printf("%d ",s[i]);
+	} printf("\n");
+
+	//展示原数据Ct
+	printf("Ct:");
+	for(i=0;i<=length;i++){
+		printf("%d ",C[i]);
+	} printf("\n");
+	
+	//展示原数据S
+		printf("S:\n");
+	for(i=0;i<n;i++){
+		for(j=0;j<m;j++) printf("%d ",S[i][j]);
+		printf("\n");
+	} printf("\n");
+
+	//那么,先生成,
+	for(i=0;i<n;i++){ //第i个工件
+		for(j=0;j<m;j++){ //第i个工件的第j个工序
+			// S[i][j];//第i个工件的第j个工序所开始的时间
+			for(k=0;k<m;k++){//找到第k个空位
+				if(result[I[i][j][0]-1][k][0]==-1) break;
+			}
+			result[ I[i][j][0] -1][k][0] = i;
+			result[ I[i][j][0] -1][k][1] = j;
+			result[ I[i][j][0] -1][k][2] = S[i][j];
+			result[ I[i][j][0] -1][k][3] = S[i][j] + I[i][j][1];
+		}
+	}
+
+	//再排序吧.对每一个机器都进行一次排序
+	for(i=0;i<m;i++){
+		//冒泡排序
+		for(j=0;j<n;j++){
+			for(k=0;k<n-1;k++){
+				if(result[i][k][2]>result[i][k+1][2]){
+					int * temp = result[i][k+1];
+					result[i][k+1] = result[i][k];
+					result[i][k] = temp;
+				}
+			}
+		}
+	}
+
+	//输出
+	for(i=0;i<m;i++){
+		printf("The machine %d :",i);
+		for(j=0;j<n;j++){
+			printf("(%d,%d-%d,%d),",result[i][j][2],result[i][j][0]+1,result[i][j][1]+1,result[i][j][3]);
+		}
+		printf("\n");
+	}
+}
+/********************************* 6-Output-END *************************************/ 
+/********************************* 0-MAIN *************************************/ 
+int main(){
+	srand((unsigned)time(NULL));
+	//1-读入信息
+	LoadInstance();
+	printInformation();
+
+	//2-初始化
+	int * eachtime = (int *)malloc(sizeof(int)*ps);
+	int ** pop = InitPopulation();
+
+	int i;
+	for(i=0;i<ps;i++){
+		 eachtime[i] = ComputeStartTimes(pop[i]) ;
+		 printf("%d\n",ComputeStartTimes(pop[i]) );
+	}
+	
+//	sortpop(eachtime,pop);
+	displaypop(pop,eachtime);
+	
+	//测试	 
+	 printf("\n");
+	 for(i=0;i<ps;i++){
+		 printf("%d\n",ComputeStartTimes(pop[i]));
+	}
+	
+	
+	
+	//3-迭代
+	iterator(pop,eachtime);
+
+	//4-输出结果
+	FormatSolution_and_display(pop[0],Ct);
+	return 0;
 }
 
-/********************************* InitPopulation *************************************/ 
-int length = 0; //染色体长度 
+/********************************* 0-MAIN-END *************************************/ 
+/********************************* 5-iterator *************************************/ 
+void shufflepop(int * eachtime,int ** pop){
+	int i;
+	for(i=0;i<(ps/2);i++){
+		int loc = rand()%(ps);
+		
+		int * temp = pop[i];
+		pop[i] = pop[loc];
+		pop[loc] = temp;
+		
+		int temp2 = eachtime[i];
+		eachtime[i] = eachtime[loc];
+		eachtime[loc] = temp2;
+	}
+}
+
+void sortpop(int * eachtime,int ** pop){
+	int i,j;
+	for(i=0;i<ps;i++){
+		for(j=0;j<ps-1;j++){
+			if(eachtime[j]<eachtime[j+1]){
+				int temp = eachtime[j];
+				eachtime[j] = eachtime[j+1];
+				eachtime[j+1] = temp;
+				
+				int *temp2 = pop[j];
+				pop[j] = pop[j+1];
+				pop[j+1] = temp2;
+			}
+		}
+	}
+}
+
+int iterator(int ** pop,int * eachtime){
+	 int i,j; //循环辅助变量 
+	 int it;	//iterator 迭代器
+	 for(it=1;it<=mit;it++){
+//	 	printf("----------第%d次迭代----------\n",it);
+		int * ch1;
+		int * ch2;
+		int time1;
+		int time2;
+	 	for(i=0;i<(ps/2);i++){
+	 		if((rand() % 100) > pc) {
+//	 			
+//	 			printf("交叉前的第%d条和第%d条染色体:\n",i,ps/2+i);
+//	 			printfparent(pop[i]);
+//	 			printfparent(pop[ps/2+i]);
+	 			
+	 			ch1 = Crossover(pop[i],pop[ps/2+i]); 
+	 			ch2 = Crossover(pop[ps/2+i],pop[i]); 
+	 			
+//	 			printf("交叉后的第%d条和第%d条染色体:\n",i,ps/2+i);
+//	 			printfparent(ch1);
+//	 			printfparent(ch2);
+	 			
+	 			if((rand() % 100) > pm){
+					Mutation(ch1);
+//					printf("变异后的第%d条染色体:\n",i);
+//		 			printfparent(ch1);
+				 }
+
+				if((rand() % 100) > pm) {
+
+					Mutation(ch2);
+//					printf("变异后的第%d条染色体:\n",ps/2 + i);
+//	 				printfparent(ch2);
+				}
+				
+	 			time1 = ComputeStartTimes(ch1);
+	 			time2 = ComputeStartTimes(ch2);
+	 			
+//	 			printf("%d %d\n",time1,time2);
+	 			
+				//这里写反了啊......什么鬼啊sort函数是从大往小排啊,那到底是什么地方搞错了
+	 			sortpop(eachtime,pop);
+	 			int replace1 = 1;
+	 			int replace2 = 1;
+	 			for(j=0;j<ps;j++){
+	 				
+	 				if(time1 >= eachtime[j] && replace1){
+	 					eachtime[j] = time1;
+	 					pop[j] = ch1;
+	 					replace1 = 0;
+					 }
+					 
+					 if(time2 >= eachtime[j] && replace2){
+	 					eachtime[j] = time2;
+	 					pop[j] = ch2;
+	 					replace2 = 0;
+					 }
+				 }
+				 
+				 shufflepop(eachtime,pop);
+			 }
+		 }
+		 
+		sortpop(eachtime,pop);
+		printf("迭代第%d次的答案:%d\n",it,eachtime[0]); 
+//		printf("%d  ",eachtime[0]); 
+		displaypop(pop,eachtime);//加速 
+		
+	//测试	 
+	 printf("\n");
+	 for(i=0;i<ps;i++){
+		 printf("%d\n",ComputeStartTimes(pop[i]));
+	 	}
+	 }
+	 
+	 sortpop(eachtime,pop);
+
+	 
+
+	 return eachtime[0];
+}
+/********************************* 5-iterator-END *************************************/ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+/********************************* 2-InitPopulation *************************************/ 
+
 
 void shuffle(int * gene) {//洗牌函数.这里对这个基因随便洗牌length/2次.太多也不好浪费时间.这个洗牌次数应该是可以由经验的出来的.
 	int i;
@@ -55,38 +343,32 @@ int ** InitPopulation(){//原本将输入两个变量,ps和I,这里先取消
 	return population;
 }
 
-void displaypop(int ** pop){//测试生成种群函数用的 
+void displaypop(int ** pop,int * eachtime){//测试生成种群函数用的 
 	int i,j;
 	for(i=0;i<ps;i++){
-		printf("%2d:",i+1);
+		printf("The %2d one use %2d:",i+1,eachtime[i]);
 		for(j=0;j<length;j++){
-			printf("%2d",pop[i][j]);
+			printf("%3d",pop[i][j]);
 		}
 		printf("\n");
 	}
 }
-/********************************* InitPopulation *************************************/ 
-/********************************* ComputDAG *************************************/ 
-struct GRAPH{//有向图的结构之节点
-    struct NODE * children;
-};
+/********************************* 2-InitPopulation-END *************************************/ 
 
-struct NODE{//有向图的结构之节点
-    int * son;
-};
 
-typedef struct NODE node;
-typedef struct GRAPH graph;
 
-graph G;
-int * st;
 
-/*
-s为染色体的乱序排列，I为输入信息;由于这个函数设计成需要传两个变量回主函数,故在此传指针.具体的操作说明:
-在主函数中定义变量G,st.然后取地址传入其中.即ComputDAG(s,I,&G,&st);即可. 
-*/
- 
-void ComputeDAG(int * s){//构建有向图
+
+
+
+
+
+
+
+
+
+/********************************* 3-ComputDAG *************************************/ 
+void ComputeDAG(int * s){//构建有向图,s为染色体的乱序排列
 	int i,j,k;//循环的辅助变量
 
     G.children = (node*)malloc(sizeof(node)*(length+1));//G.children[length]即为终止节点 
@@ -121,13 +403,15 @@ void ComputeDAG(int * s){//构建有向图
 //        
 //        printf("j and t : %d %d\n",j,t);
 //        int temp;
-//		for(temp = 0;temp<length;temp++) printf("%d  ",s[temp]);
+////        printf("s:");
+////		for(temp = 0;temp<length;temp++) printf("%d ",s[temp]);
+////		printf("\n");
+//		printf("T:");
+//		for(temp = 0;temp<n;temp++) printf("%d ",T[temp]);
 //		printf("\n");
-//		for(temp = 0;temp<n;temp++) printf("%d  ",T[temp]);
-//		printf("\n");
-//		for(temp = 0;temp<length;temp++) printf("%d  ",st[temp]);
-//		printf("\n");
-		
+//		printf("st:");
+//		for(temp = 0;temp<length;temp++) printf("%d ",st[temp]);
+//		printf("\n\n");
 		
         int r = I[j][t][0] - 1;//将j工件的第t道工序对应有序偶中的第一个数字，即该工序的机器号存入变量r
 
@@ -166,11 +450,9 @@ void ComputeDAG(int * s){//构建有向图
 }
 
 int ComputeStartTimes(int * s){//计算该染色体下所需要的时间
-
     ComputeDAG(s);//得到了一个图,得到了节点所对应的第 n 个工序
     
     int nodenum = length+1;
-    
     int * C = (int *)malloc(sizeof(int)*nodenum);
     memset(C,0,sizeof(C));
 
@@ -190,34 +472,58 @@ int ComputeStartTimes(int * s){//计算该染色体下所需要的时间
             C[i] = max;
         }
     }
+	Ct = C;
     return C[length];
 }
+/********************************* 3-ComputDAG-END *************************************/ 
 
-/********************************* ComputDAG *************************************/ 
-/********************************* Crossover *************************************/ 
 
+
+
+
+
+
+
+
+
+
+/********************************* 4-Crossover *************************************/ 
+//至于为什么这里会写得那么麻烦,是为了不破坏在第一部中已经确立好了工序关系 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define MIN(a,b) ((a)<(b)?(a):(b)) 
- 
-void Remove(int ** child,int i){
-    for(;findlen(child[i]);i++) child[i] = child[i+1];
-}
 
-int ** Index(int * p1){
+int ** Index(int * p){//返回一个二元对的数组,每个二元对中第一个表示的是工件,第二个表示的是顺序.
+//只是相当于高级一点的结构而已 
     int * ct = (int *)malloc(sizeof(int)*n);
     memset(ct,0,sizeof(int)*n);
 
-    int ** s = (int **)malloc(sizeof(int*)*findlen(p1));
+    int ** s = (int **)malloc(sizeof(int*)*length);
     int i,j;
     for(i=0;i<length;i++) s[i] = (int*)malloc(sizeof(int)*2);
     
     for(i=0,j=0;i<length;i++){
-        s[i][0] = p1[i];
-        s[i][1] = ct[p1[i]]; 
-        ct[p1[i]]++;
+        s[i][0] = p[i];
+        s[i][1] = ct[p[i]-1]; 
+        ct[p[i]-1] = ct[p[i]-1] + 1;
     }
-    
     return s;
+}
+
+void printfIndex(int ** idx){//辅助函数,用于观察内部情况 
+	int i;
+	printf("Parent:");
+	for(i=0;i<length;i++) printf("%2d",idx[i][0]);
+	printf("\n");
+	
+	printf("Index :");
+	for(i=0;i<length;i++) printf("%2d",idx[i][1]);
+	printf("\n");
+} 
+
+void printfparent(int * p){
+	int i;
+	for(i=0;i<length;i++) printf("%d ",p[i]);
+	printf("\n");
 }
 
 int * Crossover(int * p1,int *p2){//p1,p2是两条等待交叉的染色体,p为parent的缩写
@@ -225,172 +531,95 @@ int * Crossover(int * p1,int *p2){//p1,p2是两条等待交叉的染色体,p为parent的缩写
     int ** idx_p1 = Index(p1);
     int ** idx_p2 = Index(p2);
 
-    int nt = findlen(p1);
-    int randi = (rand()%(nt-1))+1;//生成[1,nt)的随机数
-    int randj = rand()%(nt-1);//生成[0,nt-1)的随机数
-    int randk = rand()%nt;//生成[0,nt)的随机数
+//	printfIndex(idx_p1);
+//	printfIndex(idx_p2);
 
-    //implant 相当于上面的“(A,2)(C,1)(A,3)(B,3)”即从Parent2抽取的片段 
-    int *** implant =  (int ***)malloc(sizeof(int**)*(MIN(randi+randj,nt)+MIN(randj+randi,nt)));
-    
-    j=0;
-    for(i=randj;i<MIN(randj+randi,nt);i++,j++){
-        implant[j] = &idx_p1[i];
-    }
-    for(i=0;i<(randi-MIN(randj+randi,nt)+randj);i++,j++){
-        implant[j] = &idx_p1[i];
-    }
+    int randi = (rand()%(length-1))+1;//生成[1,nt)的随机数,表示将嵌入的变异片段之长 
+    int randj = rand()%(length-randi);//生成[0,nt-randi-1)的随机数, 表示变异片段在parent1中的起始位置 
+    int randk = rand()%length;//生成[0,nt)的随机数,表示变异片段在parent2中的起始位置 
 
-    int ** lft_child = (int **)malloc(sizeof(int *)*randk);
-    for(i=0;i<randk;i++){
-        lft_child[i] = idx_p2[i];
-    }
-    
-    int ** rgt_child = (int **)malloc(sizeof(int *)*(nt-randk));
-    for(i=0,j=randk;i<nt-randk;i++,j++){
-        rgt_child[i] = idx_p2[j];
-    }
+//	printf("%d %d %d \n",randi,randj,randk);
 
-    for(i=0;i;i++){
-        for(j=0;j;j++){
-            if(implant[i] == lft_child[j]){
-                Remove(lft_child,j);
-            }
-            if(implant[i] == rgt_child[j]){
-                Remove(rgt_child,j);
-            }
-        }
-    }
-
-    //这里是不是可以用sizeof(implat)后用四则运算直接求出来的啊
-    int pingjiesize = 0;
-    for(i=0;findlen(lft_child[i]);i++){
-        pingjiesize ++;
-    }
-    for(i=0;findlen(rgt_child[i]);i++){
-        pingjiesize ++;
-    }
-    for(i=0;findlen(implant[i]);i++){
-        pingjiesize ++;
-    }
-
-    int * child = (int *)malloc(sizeof(int)*pingjiesize);
-    
-    j=0;
-    for(i=0;findlen(lft_child[i]);i++,j++){
-        child[j] =lft_child[i][0];
-    }
-    for(i=0;findlen(rgt_child[i]);i++,j++){
-        child[j] =rgt_child[i][0];
-    }
-    for(i=0;findlen(implant[i]);i++,j++){
-        child[j] =implant[i][0];
-    }
-
-    return child; 
-}
-
-
-/********************************* Crossover END*************************************/ 
-void shufflepop(int ** pop){
-	int i;
-	for(i=0;i<(ps/2);i++){
-		int loc = rand()%(ps);
-		int * temp = pop[i];
-		pop[i] = pop[loc];
-		pop[loc] = temp;
+    //implant 意为嵌入 .生成将变异片段. 
+    int ** implant =  (int **)malloc(sizeof(int*)*(randi));
+    for(i=0;i<randi;i++){
+    	implant[i] = (int *)malloc(sizeof(int)*2);
+		implant[i][0] = idx_p1[randj+i][0];
+		implant[i][1] = idx_p1[randj+i][1];
 	}
-}
-/********************************* MAIN *************************************/ 
-int main(){
-	srand((unsigned)time(NULL));    //以时间做种
-	int i,j,k;
 	
-	LoadInstance();
-	printInformation();
-
-	int * eachpopulationtime = (int *)malloc(sizeof(int)*ps);
-	int ** pop = InitPopulation();
-	
-	displaypop(pop);	//测试用
-	
-	int max = 0;
-	for(i=0;i<ps;i++){
-		 eachpopulationtime[i] = ComputeStartTimes(pop[i]);
-		 if(eachpopulationtime[i]>max)  max = eachpopulationtime[i];
+	//同时检测parent2中与嵌入片段重复的内容,并将其删除 
+	int * aftermutation = (int *)malloc(sizeof(int)*length) ;
+	for(i=0;i<length;i++){
+			for(j=0;j<randi;j++){
+				if(idx_p2[i][0] == implant[j][0] && idx_p2[i][1] == implant[j][1]) idx_p2[i][0] = -1;//做上标记 
+			}
 	}
+	
+//	for(i=0;i<randi;i++) printf("%d ",implant[i][0]);
+//	printf("\n");
+//	
+//	for(i=0;i<length;i++) printf("%d ",idx_p2[i][0]);
+//	printf("\n");
 
-//	for(i=0;i<ps;i++) printf("%2d:%2d\n",i,eachpopulationtime[i]);
-	printf("%d\n",max);
-
-
-	 int it;	//iterator 迭代器
-	 for(it=1;it<=mit;it++){
-		shufflepop(pop);
-		int hpop = ps/2;
-	 	 for(i=0;i<(ps/2);i++){
-	 		int pc = 60;		//交配概率,如果大于则交配 
-	 		int p1 = rand() % 100;
-	 		if(p1 > pc) {
-	 			
-	 			
-	 			
-	 			
-	 			
-	 			int pm = 60;	//突变概率,如果大于则突变 
-			 }
-		 }
-	 }
-	 
-	 return 0;
+	for(i=0,k=0;i<length;k++){
+		if(k==randk){
+			for(j=0;j<randi;j++,i++){
+				aftermutation[i] = implant[j][0];
+			}
+		}
+		
+		if(idx_p2[k][0]!=-1){
+			aftermutation[i] = idx_p2[k][0];
+			i++;
+		}		
+	}
+	
+//	printfparent(aftermutation);
+	return aftermutation;
 }
 
-/********************************* MAIN *************************************/ 
+void * Mutation(int * p){
+    int nt = length;        
+    int ranki = rand()%nt;
+    int rankj = rand()%nt;
 
-/*
-def main():
-""" pop是种群，种群中的每个个体的形式是，（makespan, 染色体）"""     
-    pop = [(ComputeStartTimes(g, I)[-1], g) for g in InitPopulation(ps, I)]
-    for it in xrange(1, mit+1):#""" mit是迭代次数"""
-        # Random ordering of the population
-        shuffle(pop)#"""把pop中各个个体的顺序打乱 """
-        hpop = len(pop) / 2#""" hpop是种群的一半"""
-        for i in xrange(hpop):#""" 遍历种群的前半部分份"""
-            if random() < pc:#"""若[0,1]之间的随机数 < pc """
-                # Create two new elements
-                ch1 = Crossover(pop[i][1], pop[hpop + i][1], I)#""" 通过交叉生成下一代"""
-                ch2 = Crossover(pop[hpop + i][1], pop[i][1], I)#""" 通过交叉生成下一代"""
-                if random() < pm:#"""若[0,1]之间的随机数 < pm """
-                    ch1 = Mutation(ch1)#""" 对ch1进行变异"""
-                if random() < pm:#"""若[0,1]之间的随机数 < pm """
-                    ch2 = Mutation(ch2)#"""对ch2进行变异"""
-                pop.append((ComputeStartTimes(ch1, I)[-1], ch1))#""" 将进化后的染色体放回种群"""
-                pop.append((ComputeStartTimes(ch2, I)[-1], ch2))
-        # Sort individuals in increasing timespan order and
-        # select only the best ones for the next iteration
-        pop.sort()#""" 将pop中的染色体按makespan排序"""
-        pop = pop[:ps]#""" 提取pop中的前ps个染色体"""
-    return pop[0]#"""返回makespan最大的染色体 """
-*/
+    int temp;
+    temp = p[ranki];
+    p[ranki] = p[rankj];
+    p[rankj] = temp;
+}
+/********************************* 4-Crossover-END*************************************/ 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+/********************************* 1-INPUT *************************************/ 
 void printInformation() {
 	int i, j;
 	printf("工件信息：(机器号，所需时间)\n");
 	for (i = 0; i<n; i++) {
-		printf("工件%2d 所需工序:", i);
+		printf("工件%2d 所需工序:", i+1);
 		for (j = 0; j<m; j++)    printf("(%2d,%2d),", I[i][j][0], I[i][j][1]);
 		printf("\n");
 	}
 }
-
-
 
 void LoadInstance() {
 	/*补充对I的说明：
 	I[i][j][0] 表示第i个工件第j个工序所需要的机器,若值为0，说明不存在这个工序
 	I[i][j][1] 表示第i个工件第j个工序所需要的时间,若值为0，说明不存在这个工序
 	*/
-
 	freopen("input.txt", "r", stdin);//默认重定向输入至input.txt，如果需要手动输入请注释改行或者修改输入文件
 	int i, j, k;//循环辅助变量
 	scanf("%d %d", &n, &m);
@@ -418,21 +647,12 @@ void LoadInstance() {
 				scanf("%d", &I[i][j][1]);
 				getchar();
 				scanf("%d", &I[i][j][0]);
+				/////
+				I[i][j][0] = I[i][j][0] +1;
 				j++;
 			}
 		}
 	}
-	
-	/*
-	储存格式为:
-
-	I[0][0][0] 为第一个工件的第一个工序的 
-	 
-	...要不要修改为I[1][1][0]是第一个工件的第一个工序所在的机器呢?感觉非常的混乱.如果修改的话似乎要加很多很多个等于号几乎是要重新写了. 
-	*/
 }
 
-
-
-
-
+/********************************* 1-INPUT-END *************************************/
