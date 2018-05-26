@@ -6,17 +6,17 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 
 //需要人为调参的量: 
-#define ps 200 //种群大小 population size
-#define mit 100 //迭代次数 mount for iteratior
+#define ps 100 //种群大小 population size
+#define mit 300 //迭代次数 mount for iteratior
 #define pc 0 //交配概率 probability for crossover
 #define pm 0 //突变概率 probability for mutation
 
 
 typedef struct GRAPH{//有向图的结构之节点 
-    struct NODE * children;
+    struct NODE * nodes;
 }graph;
 typedef struct NODE{//有向图的结构之节点之指向本节点的上一个节点们 
-    int * son;
+    int * fathers;
 }node;
 
 
@@ -134,9 +134,9 @@ void LoadInstance() {
 
 /********************************* 2-InitPopulation *************************************/ 
 
-void shuffle(int * gene) {//洗牌函数.这里对这个基因随便洗牌length/2次.太多也不好浪费时间.这个洗牌次数应该是可以由经验的出来的.
+void shuffle(int * gene) {//洗牌函数,打乱基因顺序
 	int i;
-	for (i = 0; i<length; i++) {//******************************************随机数是什么情况 
+	for (i = 0; i<length; i++) {
 		int loc1 = rand() % length;
 		int temp = gene[i];
 		gene[i] = gene[loc1];
@@ -191,7 +191,7 @@ void printfgraph(){/***********测试用**********/
 	for(i=0;i<length+1;i++){
 		printf("Node %2d:",i);
 		for(j=0;j<length;j++){
-			printf("%2d ",G.children[i].son[j]);
+			printf("%2d ",G.nodes[i].fathers[j]);
 		}
 		printf("\n");
 	}
@@ -200,10 +200,10 @@ void printfgraph(){/***********测试用**********/
 void ComputeDAG(int * s){/***********构建有向图**********/
 	int i,j,k;
 
-    G.children = (node*)malloc(sizeof(node)*(length+1));//第length+1为终止节点,G.children[length]即为终止节点 
+    G.nodes = (node*)malloc(sizeof(node)*(length+1));//第length+1为终止节点,G.nodes[length]即为终止节点 
 	for(i=0;i<length+1;i++){
-		G.children[i].son = (int *)malloc(sizeof(int)*(length)); 
-		memset(G.children[i].son,0,sizeof(int)*length);
+		G.nodes[i].fathers = (int *)malloc(sizeof(int)*(length)); 
+		memset(G.nodes[i].fathers,-1,sizeof(int)*length);
 	}
 
 //    初始化一个长度为工件数的全0list
@@ -237,16 +237,16 @@ void ComputeDAG(int * s){/***********构建有向图**********/
    
         if(t+1 == gongxushu_j) {//0,1,2,3,4,当t=4时,就是最后一个工序了
         	int tempnum;
-        	for(tempnum = 0;G.children[length].son[tempnum]!=0;tempnum++);//找终止节点的第一个空的位置
+        	for(tempnum = 0;G.nodes[length].fathers[tempnum]!=-1;tempnum++);//找终止节点的第一个空的位置
         	
-        	G.children[length].son[tempnum] = i;//存入指向终止节点的节点在染色体上的位置
+        	G.nodes[length].fathers[tempnum] = i;//存入指向终止节点的节点在染色体上的位置
 		}
 		 
         //若不是j的第一道工序则将该工序的前一道工序指向代表当前工序的节点i
         if(t>0) {
         	int tempnum;
-        	for(tempnum = 0;G.children[i].son[tempnum];tempnum++);//找到
-        	G.children[i].son[tempnum] = last_task_job[j];
+        	for(tempnum = 0;G.nodes[i].fathers[tempnum]>-1;tempnum++);//找到
+        	G.nodes[i].fathers[tempnum] = last_task_job[j];
 		}
 
         //如果之前加入的节点也在使用和j的第t道工序相同的机器r,则将这些节点编号指向当前处理节点i
@@ -256,8 +256,8 @@ void ComputeDAG(int * s){/***********构建有向图**********/
             if(j2!=j && (tasks_resource[ r ][ j2 ] > -1)){
 			//tasks_resource 的第一个坐标小于机器数,第二个坐标小于工件数
                 int tempnum;
-        		for(tempnum = 0;G.children[i].son[tempnum]!=0;tempnum++);
-        		G.children[i].son[tempnum] = tasks_resource[r][j2];
+        		for(tempnum = 0;G.nodes[i].fathers[tempnum]!=-1;tempnum++);
+        		G.nodes[i].fathers[tempnum] = tasks_resource[r][j2];
             }
         }
 
@@ -268,7 +268,7 @@ void ComputeDAG(int * s){/***********构建有向图**********/
 }
 
 int ComputeStartTimes(int * s){//计算该染色体下所需要的时间
-    ComputeDAG(s);//返回一个图,返回一个st,得到了节点所对应的第 n 个工序
+    ComputeDAG(s);//返回一个图,返回一个得到了节点所对应的第 n 个工序的数组st
     
     int nodenum = length+1;
     int * C = (int *)malloc(sizeof(int)*nodenum);
@@ -277,15 +277,15 @@ int ComputeStartTimes(int * s){//计算该染色体下所需要的时间
     int i;
     for(i=0;i<nodenum;i++){
     	
-    	int length_of_G_children_son_i;
-    	for(length_of_G_children_son_i=0;length_of_G_children_son_i<length && G.children[i].son[length_of_G_children_son_i]!=0;length_of_G_children_son_i++);
+    	int length_of_G_nodes_fathers_i;
+    	for(length_of_G_nodes_fathers_i=0;length_of_G_nodes_fathers_i<length && G.nodes[i].fathers[length_of_G_nodes_fathers_i]!=-1;length_of_G_nodes_fathers_i++);
     	
-        if(length_of_G_children_son_i == 0 ) C[i] = 0;
+        if(length_of_G_nodes_fathers_i == 0 ) C[i] = 0;
         else{
             int max = 0;
 			int k;
-            for(k=0;k<length_of_G_children_son_i;k++){
-				int l = G.children[i].son[k];
+            for(k=0;k<length_of_G_nodes_fathers_i;k++){
+				int l = G.nodes[i].fathers[k];
                 if((C[l] + I[s[l]][st[l]][1]) > max) max = C[l] + I[s[l]][st[l]][1];				
             }
             C[i] = max;
@@ -293,15 +293,11 @@ int ComputeStartTimes(int * s){//计算该染色体下所需要的时间
     }
 	Ct = C;
 
-	for(i=0;i<=length;i++) free(G.children[i].son);
-	free(G.children);
+	for(i=0;i<=length;i++) free(G.nodes[i].fathers);
+	free(G.nodes);
     return C[length];
 }
 /********************************* 3-ComputDAG-END *************************************/ 
-
-
-
-
 
 
 
@@ -487,7 +483,7 @@ int iterator(int ** pop,int * eachtime){
 		sortpop(eachtime,pop);
 		
 		/***********测试用**********/
-//		printf("迭代第%d次的答案:%d\n",it,eachtime[0]); //删去最大加速 
+		// printf("迭代第%d次的答案:%d\n",it,eachtime[0]); //删去最大加速 
 //		printf("%d  ",eachtime[0]); 
 //		displaypop(pop,eachtime);//删去加速 
 		
@@ -585,6 +581,7 @@ void FormatSolution_and_display(int * s){
 	}
 
 	//输出
+    printf("The result is : %d\n",Ct[length]);
 	for(i=0;i<m;i++){
 		printf("The machine %d :",i);
 		for(j=0;j<n;j++){
