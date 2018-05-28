@@ -4,81 +4,111 @@
 #include <time.h>
 
 //需要人为调参的量: 
-#define ps 100 //种群大小 population size
-#define mit 300 //迭代次数 mount for iteratior
-#define pc 40 //交配概率 probability for crossover
-#define pm 10//突变概率 probability for mutationi]
+#define ps 50//种群大小 population size
+#define mit 1000 //迭代次数 mount for iteratior
+#define pc 0 //交配概率 probability for crossover
+#define pm 0//突变概率 probability for mutationi
 #define totalnum 10 //遗传算法的次数 
 
 typedef struct GRAPH{//有向图的结构之节点 
     struct NODE * nodes;
 }graph;
+
 typedef struct NODE{//有向图的结构之节点之指向本节点的上一个节点们 
     int * fathers;
 }node;
 
 int *** I;	//录入信息 
 int n, m;	//工件数,机器数 
-int length = 0; //染色体长度 
-
-int * Ct;//存放每道工序开始加工的时间
+int length = 0; 	//染色体长度 
 
 /********************************* 1-Input *************************************/ 
-void printInformation();
 void LoadInstance();//默认重定向输入至input.txt，如果需要手动输入请注释改行或者修改输入文件
 /********************************* 2-InitPopulation ********************************/ 
 void shuffle(int * gene);
 int ** InitPopulation(); 
-void displaypop(int ** pop,int * eachtime);
 /********************************* 3-ComputDAG *************************************/ 
 void ComputeDAG(int * s);
-int ComputeStartTimes(int * s);
-void printfgraph();
+int ComputeStartTimes(int * s,int * Ct);
 /********************************* 4-Crossover *************************************/  
 int ** Index(int * p);
-void printfIndex(int ** idx);
-void printfparent(int * p);
 int * Crossover(int * p1,int *p2);
-void * Mutation(int * p);
+void Mutation(int * p);
 /********************************* 5-iterator *************************************/ 
 void shufflepop(int * eachtime,int ** pop);
 void sortpop(int * eachtime,int ** pop);
-int iterator(int ** pop,int * eachtime);
+int iterator(int ** pop,int * eachtime,int * Ct);
 /********************************* 6-Output *************************************/ 
-void FormatSolution_and_display(int * s);
+void FormatSolution_and_display(int * s,int * Ct);
 /********************************* 7-Observer *************************************/ 
-int results[100] = {0};
-
+void printInformation();
+void printfpop(int ** pop,int * eachtime);
+void printfgraph();
+void printfIndex(int ** idx);
+void printfparent(int * p);
 /********************************* 0-MAIN *************************************/ 
 
-
 int once(){//一次遗传算法
+
 	//1-读入信息
-	LoadInstance();
-	// printInformation();
+	// LoadInstance();	//已在main函数中读好
 
 	//2-初始化数据结构
-	 
 	int * eachtime = (int *)malloc(sizeof(int)*ps);
 	memset(eachtime,0,sizeof(int)*ps);
 	int ** pop = InitPopulation();
 
-	Ct = (int *)malloc(sizeof(int)*(length+1));
+	int * Ct = (int *)malloc(sizeof(int)*(length+1));
 
 	int i,j;
 	for(i=0;i<ps;i++){
-		 eachtime[i] = ComputeStartTimes(pop[i]);
-		 eachtime[i] = ComputeStartTimes(pop[i]);
+		 eachtime[i] = ComputeStartTimes(pop[i],Ct);
+		 eachtime[i] = ComputeStartTimes(pop[i],Ct);
 	}
 
 	//3-迭代
-	iterator(pop,eachtime);
+	iterator(pop,eachtime,Ct);
 
 	//4-输出结果
-	FormatSolution_and_display(pop[0]);
-	// displaypop(pop,eachtime);//删去加速
+	FormatSolution_and_display(pop[0],Ct);
+	// printfpop(pop,eachtime);//删去加速
 
-	//内存释放
+	int result = Ct[length];
+	free(eachtime);
+	free(Ct);
+	return result;
+}
+
+
+int main(){
+	//初始化时间相关信息
+	srand((unsigned)time(NULL));
+
+	clock_t start,finish;
+	double duration;
+	start = clock();
+
+	//1-读入信息
+	LoadInstance();
+
+	//运行多次遗传算法
+	int min = ((unsigned)1<<31)-1; 
+	int i,j;	
+	for(i=0;i<totalnum;i++) {//循环一百次
+		printf("\n/*********************************第%d次遗传算法*************************************/ \n",i);
+		int result = once();
+		if(result<min) min = result;
+	}
+
+	//输出结果
+	printf("\nThe final result is : %d \n",min);
+
+	finish = clock();
+	duration = (double)(finish-start)/CLOCKS_PER_SEC;
+	printf("%f seconds.\n",duration);
+	
+
+	// 内存释放
 	for (i = 0; i<n; i++) {
 		for (j = 0; j<m; j++) {
 			free(I[i][j]);
@@ -86,27 +116,6 @@ int once(){//一次遗传算法
 		free(I[i]);
 	}
 	free(I);
-	free(eachtime);
-	free(Ct);
-	return 0;
-}
-
-
-int main(){//多次循环版
-	//0-初始化时间变量
-	srand((unsigned)time(NULL));
-
-	int i;
-	int max = 9999999; 
-	for(i=0;i<totalnum;i++) {//循环一百次
-		printf("\n/*********************************第%d次遗传算法*************************************/ \n",i);
-		once();
-		if(Ct[length]<max) max = Ct[length];
-	}
-	printf("\nThe final result is : %d ",max);
-	
-	printf("按任意键回车退出."); 
-	system("pause");
 
 	return 0;
 }
@@ -203,7 +212,7 @@ int ** InitPopulation(){
 	return population;
 }
 
-void displaypop(int ** pop,int * eachtime){/***********测试用**********/
+void printfpop(int ** pop,int * eachtime){/***********测试用**********/
 	int i,j;
 	for(i=0;i<ps;i++){ 
 		printf("The %2d one use %2d:",i+1,eachtime[i]);
@@ -229,7 +238,7 @@ void printfgraph(graph G){/***********测试用**********/
 	}
 }
 
-int ComputeStartTimes(int * s){//计算该染色体下所需要的时间
+int ComputeStartTimes(int * s,int * Ct){//计算该染色体下所需要的时间
 
     int i,j,k;
 	graph G;
@@ -444,16 +453,16 @@ int * Crossover(int * p1,int *p2){//p1,p2是两条等待交叉的染色体,p为parent的缩写
 	return aftermutation;
 }
 
-void * Mutation(int * p){
-    int nt = length;        
-    int ranki = rand()%nt;
-    int rankj = rand()%nt;
+void Mutation(int * p){
+    int ranki = rand()%length;
+    int rankj = rand()%length;
 
     int temp;
     temp = p[ranki];
     p[ranki] = p[rankj];
     p[rankj] = temp;
 }
+
 /********************************* 4-Crossover-END*************************************/ 
 
 
@@ -491,7 +500,7 @@ void sortpop(int * eachtime,int ** pop){//升序排列
 	}
 }
 
-int iterator(int ** pop,int * eachtime){
+int iterator(int ** pop,int * eachtime,int * Ct){
 	 int i,j,k; //循环辅助变量 
 	 int it;	//iterator 迭代器
 
@@ -516,8 +525,8 @@ int iterator(int ** pop,int * eachtime){
 					Mutation(ch2);
 				}
 				
-	 			time1 = ComputeStartTimes(ch1);
-	 			time2 = ComputeStartTimes(ch2);
+	 			time1 = ComputeStartTimes(ch1,Ct);
+	 			time2 = ComputeStartTimes(ch2,Ct);
 	 			
 	 			sortpop(eachtime,pop);
 	 			int replace1 = 1;
@@ -544,9 +553,9 @@ int iterator(int ** pop,int * eachtime){
 		sortpop(eachtime,pop);
 		
 		/***********测试用**********/
-		// printf("迭代第%d次的答案:%d\n",it,eachtime[0]); //删去最大加速 
+//		 printf("迭代第%d次的答案:%d\n",it,eachtime[0]); //删去最大加速 
 //		printf("%d  ",eachtime[0]); 
-//		displaypop(pop,eachtime);//删去加速 
+//		printfpop(pop,eachtime);//删去加速 
 	 }
 
 	 sortpop(eachtime,pop);
@@ -558,9 +567,9 @@ int iterator(int ** pop,int * eachtime){
 
 
 /********************************* 6-Output *************************************/ 
-void FormatSolution_and_display(int * s){
+void FormatSolution_and_display(int * s,int * Ct){
 	
-	ComputeStartTimes(s);//再算一次,刷新Ct.函数设计失误,不应该用全局变量的.不过考虑到一次程序只算一次,忽略不计了.
+	ComputeStartTimes(s,Ct);//再算一次,刷新Ct.函数设计失误,不应该用全局变量的.不过考虑到一次程序只算一次,忽略不计了.
 
     int i,j,k;
     int * T = (int *)malloc(sizeof(int)*n);
@@ -591,25 +600,6 @@ void FormatSolution_and_display(int * s){
 	//result这个数组里面,对于每一台机器.需要知道占用的时间.被占用的机器.如果机器是只在加工时间里加工一次的话,那么就不需要知道是第几次了,搜索即可.//算了,还是顺便存上好了.
 
 	printf("/***************结果展示**************/\n");
-	/***********测试用**********/
-	// //展示原数据s
-	// printf("s:");
-	// for(i=0;i<length;i++){
-	// 	printf("%d ",s[i]);
-	// } printf("\n");
-
-	// //展示原数据Ct
-	// printf("Ct:");
-	// for(i=0;i<=length;i++){
-	// 	printf("%d ",Ct[i]);
-	// } printf("\n");
-	
-	// //展示原数据S
-	// 	printf("S:\n");
-	// for(i=0;i<n;i++){
-	// 	for(j=0;j<m;j++) printf("%d ",S[i][j]);
-	// 	printf("\n");
-	// } printf("\n");
 
 	//先生成
 	for(i=0;i<n;i++){ //第i个工件
