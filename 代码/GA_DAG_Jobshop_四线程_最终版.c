@@ -5,11 +5,13 @@
 #include <windows.h>
 
 //需要人为调参的量: 
-#define ps 40//种群大小 population size
-#define mit 1000 //迭代次数 mount for iteratior
-#define pc 40 //交配概率 probability for crossover
-#define pm 20 //突变概率 probability for mutationi
-// #define totalnum 100 //未限制时间之前的遗传次数,限制时间之后就不限制次数了,直接跑到规定时间为止
+#define ps 10//种群大小
+#define mit 1000 //迭代次数
+#define pc 40 //交配概率
+#define pm 0 //突变概率
+#define totalnum 100 //未限制时间之前的遗传次数,限制时间之后就不限制次数了,直接跑到规定时间为止
+#define ThreadTime 280 //单次遗传运行的时间
+#define programmeTime 290 //程序总运行时间
 
 typedef struct GRAPH{//有向图的结构之节点 
     struct NODE * nodes;
@@ -23,21 +25,18 @@ int *** I;	//录入信息
 int n, m;	//工件数,机器数 
 int length = 0; 	//染色体长度 
 
-//用于多线程的两个全局变量
-int final_result = ((unsigned)1<<31)-1; //存放最短时间//只能实时更新了.	
-int * ouputlist;//存放最终要输出的表格
-
+//用于多线程的四个全局变量
+int final_result = ((unsigned)1<<31)-1; //实时更新存放最短时间
 int * final_s;
 int * final_Ct;
-//还需要存一条染色体,作为结果.存了这个就不用存上面那两个了.除此之外有其他任务了.如果这两个存了也不用存final_result了.
 HANDLE hMutex;
+
 /********************************* 1-Input *************************************/ 
-void LoadInstance();//默认重定向输入至input.txt，如果需要手动输入请注释改行或者修改输入文件
+void LoadInstance();
 /********************************* 2-InitPopulation ********************************/ 
 void shuffle(int * gene);
 int ** InitPopulation(); 
 /********************************* 3-ComputDAG *************************************/ 
-void ComputeDAG(int * s);
 int ComputeStartTimes(int * s,int * Ct);
 /********************************* 4-Crossover *************************************/  
 int ** Index(int * p);
@@ -48,9 +47,8 @@ void shufflepop(int * eachtime,int ** pop);
 void sortpop(int * eachtime,int ** pop);
 int iterator(int ** pop,int * eachtime,int * Ct);
 /********************************* 6-Output *************************************/ 
-void FormatSolution_and_display(int * s,int * Ct);
-void Final_FormatSolution_and_display(int * s,int * Ct);
-/********************************* 7-Observer *************************************/ 
+void FormatSolution_and_display(int * s,int * Ct,int choice);
+/********************************* 7-Observer-删去不影响函数功能 *************************************/ 
 void printInformation();
 void printfpop(int ** pop,int * eachtime);
 void printfgraph();
@@ -80,12 +78,11 @@ int once(){//一次遗传算法
 	iterator(pop,eachtime,Ct);
 	
 	//4-输出结果
-	FormatSolution_and_display(pop[0],Ct);//等等,这个是什么,为什么这个有镇流的作用?! 
+	FormatSolution_and_display(pop[0],Ct,0); 
 
 	WaitForSingleObject(hMutex,INFINITE);
-//	printf("current final_result:%d and current Ct[length]:%d\n",final_result,Ct[length]);
+	// printf("current final_result:%d and current Ct[length]:%d\n",final_result,Ct[length]);
 	if(Ct[length] < final_result){
-//		printf("The exchange Ct[length]:%d\n",Ct[length]);
 		final_result = Ct[length];
 		for(i=0;i<length;i++) final_s[i] = pop[0][i];
 		for(i=0;i<=length;i++) final_Ct[i] = Ct[i];
@@ -93,11 +90,10 @@ int once(){//一次遗传算法
 	ReleaseMutex(hMutex);
 
 
-
+	//内粗释放及返回最优解
 	int result = Ct[length];
 	free(eachtime);
 	free(Ct);
-
 	for(i=0;i<ps;i++) free(pop[i]);
 	free(pop);
 
@@ -121,28 +117,32 @@ DWORD WINAPI original_main(LPVOID pPararneter){//原先的一次main函数,现在改为一线
 	for(i=0;;i++) {//直接跑到时间结束
 		int result = once();
 		if(result<min) min = result;
-//		printf("最小:%-4d,第%d次遗传算法:%4d,time:%d\n",min,i,result,(int)((clock()-start)/CLOCKS_PER_SEC));
-		if((double)((clock()-start)/CLOCKS_PER_SEC) > 280) break;
+		// printf("最小:%-4d,第%d次遗传算法:%4d,time:%d\n",min,i,result,(int)((clock()-start)/CLOCKS_PER_SEC));
+		if((double)((clock()-start)/CLOCKS_PER_SEC) > ThreadTime) break;
 	}
 
 	//输出结果
 	finish = clock();
 	duration = (double)(finish-start)/CLOCKS_PER_SEC;
-//	printf("%f seconds.\n",duration);
+	// printf("%f seconds.\n",duration);
 	
-//	if(min<final_result) final_result = min;
+	if(min<final_result) final_result = min;
 	
 	return 0;
 }
 
 int main(){
-	freopen("output.txt","w",stdout);
+	//默认重定向输入至input.txt，如果需要手动输入请注释该行或者修改输入文件
+	// freopen("output.txt","w",stdout);
+	freopen("input.txt", "r", stdin);
+
 	LoadInstance();
 	
 	clock_t start,finish;
 	double duration;
 	start = clock();
 	
+	//初始化储存四个线程答案的的全局变量
 	length = n*m;
 	final_s = (int *)malloc(sizeof(int)*length);
 	final_Ct = (int *)malloc(sizeof(int)*(length+1));
@@ -162,38 +162,32 @@ int main(){
 	CloseHandle(hThread3);
 	CloseHandle(hThread4);
 	
-	Sleep(290000);
+	Sleep(programmeTime*1000);
 
 	finish = clock();
 	duration = (double)(finish-start)/CLOCKS_PER_SEC;
 	
-	Final_FormatSolution_and_display(final_s,final_Ct);
+	//输出结果
+	FormatSolution_and_display(final_s,final_Ct,1);
 	printf("Time Used:%.3lf\n",duration);
 	printf("End Time:%d\n",final_result);
 	
-	// 内存释放
+	//内存释放
 	int i,j;
 	for (i = 0; i<n; i++) {
-		for (j = 0; j<m; j++) {
-			free(I[i][j]);
-		}
+		for (j = 0; j<m; j++) free(I[i][j]);
 		free(I[i]);
 	}
+	free(final_s);
+	free(final_Ct);
 	free(I);
+
 	return 0;
 }
 
 /********************************* 0-MAIN-END *************************************/ 
 /********************************* 1-INPUT *************************************/ 
-void printInformation() {
-	int i, j;
-	printf("%d件工件.%d台机器,工件信息：(机器号，所需时间)\n",n,m);
-	for (i = 0; i<n; i++) {
-		printf("工件%2d 所需工序:", i);
-		for (j = 0; j<m; j++)    printf("(%2d,%2d),", I[i][j][0], I[i][j][1]);
-		printf("\n");
-	}
-}
+
 
 void LoadInstance(){
 	/*补充对I的说明：
@@ -202,7 +196,6 @@ void LoadInstance(){
 	i,j都从头开始计算 
 	*/
 
-	freopen("input.txt", "r", stdin);//默认重定向输入至input.txt，如果需要手动输入请注释改行或者修改输入文件
 	int i, j, k;//循环辅助变量
 	scanf("%d %d", &n, &m);
 
@@ -270,34 +263,19 @@ int ** InitPopulation(){
 	return population;
 }
 
-void printfpop(int ** pop,int * eachtime){/***********测试用**********/
-	int i,j;
-	for(i=0;i<ps;i++){ 
-		printf("The %2d one use %2d:",i+1,eachtime[i]);
-		for(j=0;j<length;j++){
-			printf("%2d",pop[i][j]);
-		}
-		printf("\n");
-	}
-}
+
 /********************************* 2-InitPopulation-END *************************************/ 
 
 
 
 /********************************* 3-ComputDAG *************************************/ 
-void printfgraph(graph G){/***********测试用**********/
-	int i,j,k;
-	for(i=0;i<length+1;i++){
-		printf("Node %2d:",i);
-		for(j=0;j<length;j++){
-			printf("%2d ",G.nodes[i].fathers[j]);
-		}
-		printf("\n");
-	}
-}
+
 
 int ComputeStartTimes(int * s,int * Ct){//计算该染色体下所需要的时间
 
+	//为了将全局变量-图G进行有效的内存释放,此处将两个
+
+	//computeDAG部分
     int i,j,k;
 	graph G;
 
@@ -307,11 +285,11 @@ int ComputeStartTimes(int * s,int * Ct){//计算该染色体下所需要的时间
 		memset(G.nodes[i].fathers,-1,sizeof(int)*length);
 	}
 
-//    初始化一个长度为工件数的全0list
+    // 初始化一个长度为工件数的全0list
     int * T = (int *)malloc(sizeof(int)*n);
     memset(T,0,sizeof(int)*n);
 
-//    构造存储每个工件上一次加入图的工序号，初始化为-1
+    // 构造存储每个工件上一次加入图的工序号，初始化为-1
     int * last_task_job = (int *)malloc(sizeof(int)*n);
     memset(last_task_job,-1,sizeof(int)*n);
 
@@ -371,15 +349,14 @@ int ComputeStartTimes(int * s,int * Ct){//计算该染色体下所需要的时间
 	//内存释放
 	free(T);
 	free(last_task_job);
-
 	for(i=0;i<m;i++) free(tasks_resource[i]);
 	free(tasks_resource);
 
+	//
     int nodenum = length+1;
     int * C = (int *)malloc(sizeof(int)*nodenum);
     memset(C,0,sizeof(C));
 
-    // int i;
     for(i=0;i<nodenum;i++){
     	
     	int length_of_G_nodes_fathers_i;
@@ -402,9 +379,7 @@ int ComputeStartTimes(int * s,int * Ct){//计算该染色体下所需要的时间
 	//内存释放
 	for(i=0;i<=length;i++) free(G.nodes[i].fathers);
 	free(G.nodes);
-
 	free(st);
-
 	free(C);
 	
     return Ct[length];
@@ -414,8 +389,6 @@ int ComputeStartTimes(int * s,int * Ct){//计算该染色体下所需要的时间
 
 
 /********************************* 4-Crossover *************************************/ 
-//至于为什么这里会写得那么麻烦,是为了不破坏在第一部中已经确立好了工序关系 
-
 int ** Index(int * p){//返回一个二元对的数组,每个二元对中第一个表示的是工件,第二个表示的是顺序.P.S.这么写纯粹是为了看起来像"高级语言 
     int * ct = (int *)malloc(sizeof(int)*n);
     memset(ct,0,sizeof(int)*n);
@@ -437,22 +410,7 @@ int ** Index(int * p){//返回一个二元对的数组,每个二元对中第一个表示的是工件,第二
     return s;
 }
 
-void printfIndex(int ** idx){/***********测试用**********/
-	int i;
-	printf("Parent:");
-	for(i=0;i<length;i++) printf("%2d",idx[i][0]);
-	printf("\n");
-	
-	printf("Index :");
-	for(i=0;i<length;i++) printf("%2d",idx[i][1]);
-	printf("\n");
-} 
 
-void printfparent(int * p){/***********测试用**********/
-	int i;
-	for(i=0;i<length;i++) printf("%d ",p[i]);
-	printf("\n");
-}
 
 int * Crossover(int * p1,int *p2){//p1,p2是两条等待交叉的染色体,p为parent的缩写
     int i,j,k;//用于循环的辅助变量
@@ -495,7 +453,6 @@ int * Crossover(int * p1,int *p2){//p1,p2是两条等待交叉的染色体,p为parent的缩写
 	 //内存释放
 	for(i=0;i<randi;i++) free(implant[i]);
 	free(implant);
-
 	for(i=0;i<length;i++) { free(idx_p1[i]); free(idx_p2[i]); }
 	free(idx_p1);
 	free(idx_p2); 
@@ -565,7 +522,7 @@ int iterator(int ** pop,int * eachtime,int * Ct){
 	int * temptime = (int *)malloc(sizeof(int)*ps);//该染色体对应的时间
 	memset(temptime,-1,sizeof(int)*ps);
 
-	
+
 	for(it=1;it<=mit;it++){
 		int * ch1;
 		int * ch2;
@@ -598,23 +555,6 @@ int iterator(int ** pop,int * eachtime,int * Ct){
 				for(j=0;j<length;j++) temp[son][j] = ch2[j];
 				temptime[son] = time2;
 				son++;
-
-	 			// sortpop(eachtime,pop);//为了插入,作升序排列	//其实不需要吧,本意是为了速度更快一点,但现在想想肯定比直接找要慢的
-	 			// int replace1 = 1;
-	 			// int replace2 = 1;
-	 			// for(j=0;j<ps;j++){
-	 			// 	if(time1 < eachtime[j] && replace1){
-	 			// 		eachtime[j] = time1;
-				// 		for(k=0;k<length;k++) pop[j][k] = ch1[k];
-	 			// 		replace1 = 0;
-				// 	 }
-				// 	 if(time2 < eachtime[j] && replace2){
-	 			// 		eachtime[j] = time2;
-				// 		for(k=0;k<length;k++) pop[j][k] = ch2[k];
-	 			// 		replace2 = 0;
-				// 	 }
-				//  }
-				//  shufflepop(eachtime,pop);
 
 				free(ch1);
 				free(ch2);
@@ -648,125 +588,17 @@ int iterator(int ** pop,int * eachtime,int * Ct){
 	for(i=0;i<ps;i++) free(temp[i]);
 	free(temp);
 
+	//排序并返回答案(若需要)
 	sortpop(eachtime,pop);
 	return eachtime[0];
 }
-
-
-
-
-/* 
-//乱伦版 
-int iterator(int ** pop,int * eachtime,int * Ct){
-	 int i,j,k; //循环辅助变量 
-	 int it;	//iterator 迭代器
-
-	//为了满足一次迭代内,染色体只与同代的染色体杂交,需要把新成生成的优秀子代给保存下来.等到所有杂交完毕之后,再加入淘汰落后的子代
-	int ** temp = (int **)malloc(sizeof(int *)*ps);//存染色体顺序
-	for(i=0;i<ps;i++){
-		temp[i] = (int *)malloc(sizeof(int)*length);
-		memset(temp[i],-1,sizeof(int)*length);//未存入优秀子代的部分设置为负一,以作标记
-	}
-	int * temptime = (int *)malloc(sizeof(int)*ps);//该染色体对应的时间
-	memset(temptime,-1,sizeof(int)*ps);
-
-	
-	for(it=1;it<=mit;it++){
-		int * ch1;
-		int * ch2;
-		int time1;
-		int time2;
-
-		int son = 0;//用于记录的序号,指向temp中序号最小的空位.记录生成到几个子代,便于插入进temp中的空位中
-
-	 	for(i=0;i<(ps/2);i++){//进行交叉互换
-	 		if((rand() % 100) > pc){
-
-	 			ch1 = Crossover(pop[i],pop[ps/2+i]);
-	 			ch2 = Crossover(pop[ps/2+i],pop[i]);
-	 			
-	 			if((rand() % 100) > pm){
-					Mutation(ch1);
-				 }
-
-				if((rand() % 100) > pm){
-					Mutation(ch2);
-				}
-				
-	 			time1 = ComputeStartTimes(ch1,Ct);
-	 			time2 = ComputeStartTimes(ch2,Ct);
-	 			
-				//存储
-				for(j=0;j<length;j++) temp[son][j] = ch1[j];
-				temptime[son] = time1;
-				son++;
-				for(j=0;j<length;j++) temp[son][j] = ch2[j];
-				temptime[son] = time2;
-				son++;
-
-	 			// sortpop(eachtime,pop);//为了插入,作升序排列	//其实不需要吧,本意是为了速度更快一点,但现在想想肯定比直接找要慢的
-	 			// int replace1 = 1;
-	 			// int replace2 = 1;
-	 			// for(j=0;j<ps;j++){
-	 			// 	if(time1 < eachtime[j] && replace1){
-	 			// 		eachtime[j] = time1;
-				// 		for(k=0;k<length;k++) pop[j][k] = ch1[k];
-	 			// 		replace1 = 0;
-				// 	 }
-				// 	 if(time2 < eachtime[j] && replace2){
-	 			// 		eachtime[j] = time2;
-				// 		for(k=0;k<length;k++) pop[j][k] = ch2[k];
-	 			// 		replace2 = 0;
-				// 	 }
-				//  }
-				//  shufflepop(eachtime,pop);
-
-				free(ch1);
-				free(ch2);
-			 }
-		}
-		 
-		//子代替换父代,顺便清空
-		for(i=0;i<son;i++){
-			for(j=0;j<ps;j++){
-				if(temptime[i] < eachtime[j]){
-					eachtime[j] = temptime[i];
-					for(k=0;k<length;k++){
-						pop[j][k] = temp[i][k];
-					}
-					break;	//只要替换了一次就退出,防止重复
-				}
-			}
-			memset(temp[i],-1,sizeof(int)*length);
-			temptime[i] = -1;
-		}
-		
-		shufflepop(eachtime,pop);
-		/***********测试用*********
-		//  printf("迭代第%d次的答案:%d\n",it,eachtime[0]); //删去最大加速 
-		// printf("%d  ",eachtime[0]); 
-		// printfpop(pop,eachtime);//删去加速 
-	 }
-
-	//内存释放
-	free(temptime);
-	for(i=0;i<ps;i++) free(temp[i]);
-	free(temp);
-
-	sortpop(eachtime,pop);
-	return eachtime[0];
-}
-*/ 
 
 /********************************* 5-iterator-END *************************************/ 
 
-
-
-
 /********************************* 6-Output *************************************/ 
-void FormatSolution_and_display(int * s,int * Ct){
+void FormatSolution_and_display(int * s,int * Ct,int choice){//choice为0:不输出工序.choice为1,输出工序
 	
-	ComputeStartTimes(s,Ct);//再算一次,刷新Ct.函数设计失误,不应该用全局变量的.不过考虑到一次程序只算一次,忽略不计了.
+	// ComputeStartTimes(s,Ct);//再算一次,刷新Ct.函数设计失误,不应该用全局变量的.不过考虑到一次程序只算一次,忽略不计了.
 
     int i,j,k;
     int * T = (int *)malloc(sizeof(int)*n);
@@ -812,7 +644,7 @@ void FormatSolution_and_display(int * s,int * Ct){
 	}
 
 	// 再排序.对每一个机器都进行一次排序
-	for(i=0;i<m;i++){//冒泡排序
+	for(i=0;i<m;i++){//排序每个工序的开始时间
 		for(j=0;j<n;j++){
 			for(k=0;k<n-1;k++){
 				if(result[i][k][2]>result[i][k+1][2]){
@@ -824,117 +656,77 @@ void FormatSolution_and_display(int * s,int * Ct){
 		}
 	}
 
-// 	输出
-//    printf("The result is : %d\n",Ct[length]);
-// 	for(i=0;i<m;i++){
-// 		printf("M%d ",i);
-// 		for(j=0;j<n;j++){
-// 			printf("(%d,%d-%d,%d) ",result[i][j][2],result[i][j][0]+1,result[i][j][1]+1,result[i][j][3]);
-// 		}
-// 		printf("\n");
-// 	}
+	if(choice){
+		for(i=0;i<m;i++){
+			printf("M%d ",i);
+			for(j=0;j<n;j++)
+				printf("(%d,%d-%d,%d) ",result[i][j][2],result[i][j][0]+1,result[i][j][1]+1,result[i][j][3]);
+			printf("\n");
+		}		
+	}
 
 	//内存释放
 	free(T);
 	
-    for(i=0;i<n;i++){
-        free(S[i]);
-    }
+    for(i=0;i<n;i++) free(S[i]);
     free(S);
     
 	for(i=0;i<m;i++){
-		for(j=0;j<n;j++){
-			free(result[i][j]);
-		}
+		for(j=0;j<n;j++) free(result[i][j]);
 		free(result[i]);
 	}
 	free(result);
-}
-
-void Final_FormatSolution_and_display(int * s,int * Ct){
-	
-	ComputeStartTimes(s,Ct);//再算一次,刷新Ct.函数设计失误,不应该用全局变量的.不过考虑到一次程序只算一次,忽略不计了.
-
-    int i,j,k;
-    int * T = (int *)malloc(sizeof(int)*n);
-    memset(T,0,sizeof(int)*n);
-	
-	//S中存放的是每道工序开始加工的时间，它的形式为：[[a,b,c],[d,e,f],[g,h,i]],每个子list代表一个工件的信息，子list中的字母代表这个工件下面每道工序开始加工的时间。
-    int ** S = (int **)malloc(sizeof(int *)*n);
-    for(i=0;i<n;i++){
-        S[i] = (int *)malloc(sizeof(int)*m);
-        memset(S[i],0,sizeof(int)*m);
-    }
-
-    for(i=0;i<length;i++){
-        int j = s[i];//获得工件号
-        int t = T[j];//获得这是第j个工件的第t个工序
-        S[j][t] = Ct[i]; //第j个工件的第t个工序的开始时间
-        T[j] = T[j] + 1;
-    }
-	
-	int *** result = (int ***)malloc(sizeof(int**)*m);//第i台机器
-	for(i=0;i<m;i++){
-		result[i] = (int **)malloc(sizeof(int*)*n);//第i台机器的第j个工序
-		for(j=0;j<n;j++){
-			result[i][j] = (int *)malloc(sizeof(int)*4);//第i台机器的第j个工序所对应工件的序号,和这个工件的所在工序,以及开始时间,终止时间
-			memset(result[i][j],-1,sizeof(int)*4);//-1表示没访问过
-		}
-	}
-	//result这个数组里面,对于每一台机器.需要知道占用的时间.被占用的机器.如果机器是只在加工时间里加工一次的话,那么就不需要知道是第几次了,搜索即可.//算了,还是顺便存上好了.
-
-
-	//先生成
-	for(i=0;i<n;i++){ //第i个工件
-		for(j=0;j<m;j++){ //第i个工件的第j个工序
-			// S[i][j];//第i个工件的第j个工序所开始的时间
-			for(k=0;k<n;k++){//找到第k个空位
-				if(result[ I[i][j][0] ][k][0]==-1) break;
-			}
-			result[ I[i][j][0] ][k][0] = i;
-			result[ I[i][j][0] ][k][1] = j;
-			result[ I[i][j][0] ][k][2] = S[i][j];
-			result[ I[i][j][0] ][k][3] = S[i][j] + I[i][j][1];
-		}
-	}
-
-	// 再排序.对每一个机器都进行一次排序
-	for(i=0;i<m;i++){//冒泡排序
-		for(j=0;j<n;j++){
-			for(k=0;k<n-1;k++){
-				if(result[i][k][2]>result[i][k+1][2]){
-					int * temp = result[i][k+1];
-					result[i][k+1] = result[i][k];
-					result[i][k] = temp;
-				}
-			}
-		}
-	}
-
-// 	输出
- 	for(i=0;i<m;i++){
- 		printf("M%d ",i);
- 		for(j=0;j<n;j++){
- 			printf("(%d,%d-%d,%d) ",result[i][j][2],result[i][j][0]+1,result[i][j][1]+1,result[i][j][3]);
- 		}
- 		printf("\n");
- 	}
-
-	//内存释放
-	free(T);
-	
-    for(i=0;i<n;i++){
-        free(S[i]);
-    }
-    free(S);
-    
-	for(i=0;i<m;i++){
-		for(j=0;j<n;j++){
-			free(result[i][j]);
-		}
-		free(result[i]);
-	}
-	free(result);
-}
+} 
 /********************************* 6-Output-END *************************************/ 
 
+/********************************* 7-observer-(删去不影响代码功能) *************************************/ 
+
+void printfIndex(int ** idx){
+	int i;
+	printf("Parent:");
+	for(i=0;i<length;i++) printf("%2d",idx[i][0]);
+	printf("\n");
+	
+	printf("Index :");
+	for(i=0;i<length;i++) printf("%2d",idx[i][1]);
+	printf("\n");
+} 
+
+void printfparent(int * p){
+	int i;
+	for(i=0;i<length;i++) printf("%d ",p[i]);
+	printf("\n");
+}
+
+void printfgraph(graph G){
+	int i,j,k;
+	for(i=0;i<length+1;i++){
+		printf("Node %2d:",i);
+		for(j=0;j<length;j++){
+			printf("%2d ",G.nodes[i].fathers[j]);
+		}
+		printf("\n");
+	}
+}
+
+void printInformation() {
+	int i, j;
+	printf("%d件工件.%d台机器,工件信息：(机器号，所需时间)\n",n,m);
+	for (i = 0; i<n; i++) {
+		printf("工件%2d 所需工序:", i);
+		for (j = 0; j<m; j++)    printf("(%2d,%2d),", I[i][j][0], I[i][j][1]);
+		printf("\n");
+	}
+}
+
+void printfpop(int ** pop,int * eachtime){
+	int i,j;
+	for(i=0;i<ps;i++){ 
+		printf("The %2d one use %2d:",i+1,eachtime[i]);
+		for(j=0;j<length;j++){
+			printf("%2d",pop[i][j]);
+		}
+		printf("\n");
+	}
+}
+/********************************* 7-observer-END *************************************/ 
