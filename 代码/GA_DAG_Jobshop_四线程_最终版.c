@@ -4,14 +4,13 @@
 #include <time.h>
 #include <windows.h>
 
-//ĞèÒªÈËÎªµ÷²ÎµÄÁ¿: 
-#define ps 10//ÖÖÈº´óĞ¡
-#define mit 1000 //µü´ú´ÎÊı
+#define ps 20//ÖÖÈº´óĞ¡
+#define mit 100 //µü´ú´ÎÊı
 #define pc 40 //½»Åä¸ÅÂÊ
-#define pm 0 //Í»±ä¸ÅÂÊ
+#define pm 90 //Í»±ä¸ÅÂÊ
 #define totalnum 100 //Î´ÏŞÖÆÊ±¼äÖ®Ç°µÄÒÅ´«´ÎÊı,ÏŞÖÆÊ±¼äÖ®ºó¾Í²»ÏŞÖÆ´ÎÊıÁË,Ö±½ÓÅÜµ½¹æ¶¨Ê±¼äÎªÖ¹
-#define ThreadTime 280 //µ¥´ÎÒÅ´«ÔËĞĞµÄÊ±¼ä
-#define programmeTime 290 //³ÌĞò×ÜÔËĞĞÊ±¼ä
+#define ThreadTime 10//µ¥´ÎÒÅ´«ÔËĞĞµÄÊ±¼ä
+#define programmeTime 30 //³ÌĞò×ÜÔËĞĞÊ±¼ä
 
 typedef struct GRAPH{//ÓĞÏòÍ¼µÄ½á¹¹Ö®½Úµã 
     struct NODE * nodes;
@@ -29,7 +28,10 @@ int length = 0; 	//È¾É«Ìå³¤¶È
 int final_result = ((unsigned)1<<31)-1; //ÊµÊ±¸üĞÂ´æ·Å×î¶ÌÊ±¼ä
 int * final_s;
 int * final_Ct;
-HANDLE hMutex;
+HANDLE hMutex;//ÓÃÓÚ·ÀÖ¹¸÷Ïß³ÌÖ®¼äµÄÏà»¥¸ÉÈÅ
+
+//ÓÃÓÚÄ£Äâ¼ìĞŞµÄÈ«¾Ö±äÁ¿
+//Ê©¹¤ÖĞ
 
 /********************************* 1-Input *************************************/ 
 void LoadInstance();
@@ -55,11 +57,7 @@ void printfgraph();
 void printfIndex(int ** idx);
 void printfparent(int * p);
 /********************************* 0-MAIN *************************************/ 
-
 int once(){//Ò»´ÎÒÅ´«Ëã·¨
-
-	//1-¶ÁÈëĞÅÏ¢
-	// LoadInstance();	//ÒÑÔÚmainº¯ÊıÖĞ¶ÁºÃ
 
 	//2-³õÊ¼»¯Êı¾İ½á¹¹
 	int * eachtime = (int *)malloc(sizeof(int)*ps);
@@ -78,17 +76,20 @@ int once(){//Ò»´ÎÒÅ´«Ëã·¨
 	iterator(pop,eachtime,Ct);
 	
 	//4-Êä³ö½á¹û
-	FormatSolution_and_display(pop[0],Ct,0); 
+	// FormatSolution_and_display(pop[0],Ct,1); //ÏÔÊ¾Ã¿Ò»´Îµü´úµÄ¾ßÌå½á¹û
+	ComputeStartTimes(pop[0],Ct);
+	
+	// printf("Time Used:%.3lf\n",Ct[0]);
+	printf("End Time:%d\n",final_result);
 
+	//ĞŞ¸ÄÈ«¾Ö±äÁ¿
 	WaitForSingleObject(hMutex,INFINITE);
-	// printf("current final_result:%d and current Ct[length]:%d\n",final_result,Ct[length]);
 	if(Ct[length] < final_result){
 		final_result = Ct[length];
 		for(i=0;i<length;i++) final_s[i] = pop[0][i];
 		for(i=0;i<=length;i++) final_Ct[i] = Ct[i];
 	}
 	ReleaseMutex(hMutex);
-
 
 	//ÄÚ´ÖÊÍ·Å¼°·µ»Ø×îÓÅ½â
 	int result = Ct[length];
@@ -108,8 +109,6 @@ DWORD WINAPI original_main(LPVOID pPararneter){//Ô­ÏÈµÄÒ»´Îmainº¯Êı,ÏÖÔÚ¸ÄÎªÒ»Ïß
 	clock_t start,finish;
 	double duration;
 	start = clock();
-
-	//1-¶ÁÈëĞÅÏ¢ //ÒÑÔÚmainÖĞ¶ÁºÃ
 
 	//ÔËĞĞ¶à´ÎÒÅ´«Ëã·¨
 	int min = ((unsigned)1<<31)-1; 
@@ -132,6 +131,7 @@ DWORD WINAPI original_main(LPVOID pPararneter){//Ô­ÏÈµÄÒ»´Îmainº¯Êı,ÏÖÔÚ¸ÄÎªÒ»Ïß
 }
 
 int main(){
+
 	//Ä¬ÈÏÖØ¶¨ÏòÊäÈëÖÁinput.txt£¬Èç¹ûĞèÒªÊÖ¶¯ÊäÈëÇë×¢ÊÍ¸ÃĞĞ»òÕßĞŞ¸ÄÊäÈëÎÄ¼ş
 	// freopen("output.txt","w",stdout);
 	freopen("input.txt", "r", stdin);
@@ -151,16 +151,16 @@ int main(){
 	hMutex=CreateMutex(NULL,FALSE,NULL);
 	hThread1=CreateThread(NULL,0,original_main,NULL ,0,NULL);
 	Sleep(1000);//¸Ä±ä×÷ÎªËæ»úÊıÖÖ×ÓµÄÊ±¼ä 
-	hThread2=CreateThread(NULL,0,original_main,NULL ,0,NULL);
-	Sleep(1000);
-	hThread3=CreateThread(NULL,0,original_main,NULL ,0,NULL);
-	Sleep(1000);
-	hThread4=CreateThread(NULL,0,original_main,NULL ,0,NULL);
+//	hThread2=CreateThread(NULL,0,original_main,NULL ,0,NULL);
+//	Sleep(1000);
+//	hThread3=CreateThread(NULL,0,original_main,NULL ,0,NULL);
+//	Sleep(1000);
+//	hThread4=CreateThread(NULL,0,original_main,NULL ,0,NULL);
 	
 	CloseHandle(hThread1);
-	CloseHandle(hThread2);
-	CloseHandle(hThread3);
-	CloseHandle(hThread4);
+	// CloseHandle(hThread2);
+	// CloseHandle(hThread3);
+	// CloseHandle(hThread4);
 	
 	Sleep(programmeTime*1000);
 
@@ -187,8 +187,6 @@ int main(){
 
 /********************************* 0-MAIN-END *************************************/ 
 /********************************* 1-INPUT *************************************/ 
-
-
 void LoadInstance(){
 	/*²¹³ä¶ÔIµÄËµÃ÷£º
 	I[i][j][0] ±íÊ¾µÚi¸ö¹¤¼şµÚj¸ö¹¤ĞòËùĞèÒªµÄ»úÆ÷,ÈôÖµÎª0£¬ËµÃ÷²»´æÔÚÕâ¸ö¹¤Ğò
@@ -217,9 +215,6 @@ void LoadInstance(){
 	//ÄÚ´æÊÍ·Å:IÔÚÖ÷º¯Êıfree
 }
 /********************************* 1-INPUT-END *************************************/
-
-
-
 /********************************* 2-InitPopulation *************************************/ 
 
 void shuffle(int * gene) {//Ï´ÅÆº¯Êı,´òÂÒ»ùÒòË³Ğò
@@ -265,15 +260,8 @@ int ** InitPopulation(){
 
 
 /********************************* 2-InitPopulation-END *************************************/ 
-
-
-
 /********************************* 3-ComputDAG *************************************/ 
-
-
 int ComputeStartTimes(int * s,int * Ct){//¼ÆËã¸ÃÈ¾É«ÌåÏÂËùĞèÒªµÄÊ±¼ä
-
-	//ÎªÁË½«È«¾Ö±äÁ¿-Í¼G½øĞĞÓĞĞ§µÄÄÚ´æÊÍ·Å,´Ë´¦½«Á½¸ö
 
 	//computeDAG²¿·Ö
     int i,j,k;
@@ -352,7 +340,6 @@ int ComputeStartTimes(int * s,int * Ct){//¼ÆËã¸ÃÈ¾É«ÌåÏÂËùĞèÒªµÄÊ±¼ä
 	for(i=0;i<m;i++) free(tasks_resource[i]);
 	free(tasks_resource);
 
-	//
     int nodenum = length+1;
     int * C = (int *)malloc(sizeof(int)*nodenum);
     memset(C,0,sizeof(C));
@@ -409,8 +396,6 @@ int ** Index(int * p){//·µ»ØÒ»¸ö¶şÔª¶ÔµÄÊı×é,Ã¿¸ö¶şÔª¶ÔÖĞµÚÒ»¸ö±íÊ¾µÄÊÇ¹¤¼ş,µÚ¶ş
 
     return s;
 }
-
-
 
 int * Crossover(int * p1,int *p2){//p1,p2ÊÇÁ½ÌõµÈ´ı½»²æµÄÈ¾É«Ìå,pÎªparentµÄËõĞ´
     int i,j,k;//ÓÃÓÚÑ­»·µÄ¸¨Öú±äÁ¿
@@ -594,11 +579,10 @@ int iterator(int ** pop,int * eachtime,int * Ct){
 }
 
 /********************************* 5-iterator-END *************************************/ 
-
 /********************************* 6-Output *************************************/ 
 void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹¤Ğò.choiceÎª1,Êä³ö¹¤Ğò
-	
-	// ComputeStartTimes(s,Ct);//ÔÙËãÒ»´Î,Ë¢ĞÂCt.º¯ÊıÉè¼ÆÊ§Îó,²»Ó¦¸ÃÓÃÈ«¾Ö±äÁ¿µÄ.²»¹ı¿¼ÂÇµ½Ò»´Î³ÌĞòÖ»ËãÒ»´Î,ºöÂÔ²»¼ÆÁË.
+
+	ComputeStartTimes(s,Ct);//ÔÙËãÒ»´Î,Ë¢ĞÂCt.º¯ÊıÉè¼ÆÊ§Îó,²»Ó¦¸ÃÓÃÈ«¾Ö±äÁ¿µÄ.²»¹ı¿¼ÂÇµ½Ò»´Î³ÌĞòÖ»ËãÒ»´Î,ºöÂÔ²»¼ÆÁË. //Ô­ÒòÎ´ÖªµÄbug
 
     int i,j,k;
     int * T = (int *)malloc(sizeof(int)*n);
@@ -618,10 +602,10 @@ void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹
         T[j] = T[j] + 1;
     }
 	
-	int *** result = (int ***)malloc(sizeof(int**)*m);//µÚiÌ¨»úÆ÷
-	for(i=0;i<m;i++){
-		result[i] = (int **)malloc(sizeof(int*)*n);//µÚiÌ¨»úÆ÷µÄµÚj¸ö¹¤Ğò
-		for(j=0;j<n;j++){
+	int *** result = (int ***)malloc(sizeof(int**)*m);
+	for(i=0;i<m;i++){//µÚiÌ¨»úÆ÷
+		result[i] = (int **)malloc(sizeof(int*)*n);
+		for(j=0;j<n;j++){//µÚiÌ¨»úÆ÷µÄµÚj¸ö¹¤Ğò
 			result[i][j] = (int *)malloc(sizeof(int)*4);//µÚiÌ¨»úÆ÷µÄµÚj¸ö¹¤ĞòËù¶ÔÓ¦¹¤¼şµÄĞòºÅ,ºÍÕâ¸ö¹¤¼şµÄËùÔÚ¹¤Ğò,ÒÔ¼°¿ªÊ¼Ê±¼ä,ÖÕÖ¹Ê±¼ä
 			memset(result[i][j],-1,sizeof(int)*4);//-1±íÊ¾Ã»·ÃÎÊ¹ı
 		}
@@ -629,7 +613,7 @@ void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹
 	//resultÕâ¸öÊı×éÀïÃæ,¶ÔÓÚÃ¿Ò»Ì¨»úÆ÷.ĞèÒªÖªµÀÕ¼ÓÃµÄÊ±¼ä.±»Õ¼ÓÃµÄ»úÆ÷.Èç¹û»úÆ÷ÊÇÖ»ÔÚ¼Ó¹¤Ê±¼äÀï¼Ó¹¤Ò»´ÎµÄ»°,ÄÇÃ´¾Í²»ĞèÒªÖªµÀÊÇµÚ¼¸´ÎÁË,ËÑË÷¼´¿É.//ËãÁË,»¹ÊÇË³±ã´æÉÏºÃÁË.
 
 
-	//ÏÈÉú³É
+	//Éú³É
 	for(i=0;i<n;i++){ //µÚi¸ö¹¤¼ş
 		for(j=0;j<m;j++){ //µÚi¸ö¹¤¼şµÄµÚj¸ö¹¤Ğò
 			// S[i][j];//µÚi¸ö¹¤¼şµÄµÚj¸ö¹¤ĞòËù¿ªÊ¼µÄÊ±¼ä
@@ -643,7 +627,7 @@ void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹
 		}
 	}
 
-	// ÔÙÅÅĞò.¶ÔÃ¿Ò»¸ö»úÆ÷¶¼½øĞĞÒ»´ÎÅÅĞò
+	//ÅÅĞò.¶ÔÃ¿Ò»¸ö»úÆ÷¶¼½øĞĞÒ»´ÎÅÅĞò
 	for(i=0;i<m;i++){//ÅÅĞòÃ¿¸ö¹¤ĞòµÄ¿ªÊ¼Ê±¼ä
 		for(j=0;j<n;j++){
 			for(k=0;k<n-1;k++){
@@ -659,11 +643,20 @@ void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹
 	if(choice){
 		for(i=0;i<m;i++){
 			printf("M%d ",i);
-			for(j=0;j<n;j++)
+			for(j=0;j<n;j++){
+				
+				// ²âÊÔ´úÂë£º
+				// if(j>0){//ÁÙÊ±²âÊÔ£º¼ìÑéÓĞÎŞ³åÍ»
+				// 	if(result[i][j][2]<result[i][j-1][3]) printf("¨€¨€ERROR¨€¨€");
+				// }
+
 				printf("(%d,%d-%d,%d) ",result[i][j][2],result[i][j][0]+1,result[i][j][1]+1,result[i][j][3]);
+
+			}
 			printf("\n");
 		}		
 	}
+
 
 	//ÄÚ´æÊÍ·Å
 	free(T);
