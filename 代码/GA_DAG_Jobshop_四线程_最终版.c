@@ -8,9 +8,9 @@
 #define mit 100 //µü´ú´ÎÊı
 #define pc 40 //½»Åä¸ÅÂÊ
 #define pm 90 //Í»±ä¸ÅÂÊ
-#define totalnum 100 //Î´ÏŞÖÆÊ±¼äÖ®Ç°µÄÒÅ´«´ÎÊı,ÏŞÖÆÊ±¼äÖ®ºó¾Í²»ÏŞÖÆ´ÎÊıÁË,Ö±½ÓÅÜµ½¹æ¶¨Ê±¼äÎªÖ¹
-#define ThreadTime 10//µ¥´ÎÒÅ´«ÔËĞĞµÄÊ±¼ä
-#define programmeTime 30 //³ÌĞò×ÜÔËĞĞÊ±¼ä
+#define totalnum 100 //Î´ÏŞÖÆÊ±¼äÖ®Ç°µÄÒÅ´«´ÎÊı.ÏŞÖÆÊ±¼äÖ®ºó¾Í²»ÏŞÖÆ´ÎÊıÁË,Ö±½ÓÅÜµ½¹æ¶¨Ê±¼äÎªÖ¹
+#define ThreadTime 1//µ¥´ÎÒÅ´«ÔËĞĞµÄÊ±¼ä
+#define programmeTime 2 //³ÌĞò×ÜÔËĞĞÊ±¼ä
 
 typedef struct GRAPH{//ÓĞÏòÍ¼µÄ½á¹¹Ö®½Úµã 
     struct NODE * nodes;
@@ -30,7 +30,10 @@ int * final_s;
 int * final_Ct;
 HANDLE hMutex;//ÓÃÓÚ·ÀÖ¹¸÷Ïß³ÌÖ®¼äµÄÏà»¥¸ÉÈÅ
 
-//ÓÃÓÚÄ£Äâ¼ìĞŞµÄÈ«¾Ö±äÁ¿
+//ÓÃÓÚÊä³ö¼°¼ìĞŞµÄµÄÈ«¾Ö±äÁ¿
+int *** result;
+int ** overhaul_list;
+int TIME;//ÓÃÀ´Í¬²½ÓëÊäÈëÓëÊä³ö¹ı³ÌÖĞµÄÊ±¼ä
 //Ê©¹¤ÖĞ
 
 /********************************* 1-Input *************************************/ 
@@ -49,7 +52,14 @@ void shufflepop(int * eachtime,int ** pop);
 void sortpop(int * eachtime,int ** pop);
 int iterator(int ** pop,int * eachtime,int * Ct);
 /********************************* 6-Output *************************************/ 
-void FormatSolution_and_display(int * s,int * Ct,int choice);
+void FormatSovelution_and_display(int * s,int * Ct,int choice);
+
+/********************************* 7-Overhaul *************************************/ 
+int checkstate(int aimm,int time);
+void putforward(int aimi,int aimj);
+DWORD WINAPI overhaul_output(LPVOID pPararneter);
+DWORD WINAPI overhaul_input(LPVOID pPararneter);
+void insert_overhaul(int aimi,int aimj);
 /********************************* 7-Observer-É¾È¥²»Ó°Ïìº¯Êı¹¦ÄÜ *************************************/ 
 void printInformation();
 void printfpop(int ** pop,int * eachtime);
@@ -76,12 +86,9 @@ int once(){//Ò»´ÎÒÅ´«Ëã·¨
 	iterator(pop,eachtime,Ct);
 	
 	//4-Êä³ö½á¹û
-	// FormatSolution_and_display(pop[0],Ct,1); //ÏÔÊ¾Ã¿Ò»´Îµü´úµÄ¾ßÌå½á¹û
+	// FormatSovelution_and_display(pop[0],Ct,1); //ÏÔÊ¾Ã¿Ò»´Îµü´úµÄ¾ßÌå½á¹û
 	ComputeStartTimes(pop[0],Ct);
 	
-	// printf("Time Used:%.3lf\n",Ct[0]);
-	printf("End Time:%d\n",final_result);
-
 	//ĞŞ¸ÄÈ«¾Ö±äÁ¿
 	WaitForSingleObject(hMutex,INFINITE);
 	if(Ct[length] < final_result){
@@ -90,6 +97,8 @@ int once(){//Ò»´ÎÒÅ´«Ëã·¨
 		for(i=0;i<=length;i++) final_Ct[i] = Ct[i];
 	}
 	ReleaseMutex(hMutex);
+
+	printf("End Time:%d\n",final_result);
 
 	//ÄÚ´ÖÊÍ·Å¼°·µ»Ø×îÓÅ½â
 	int result = Ct[length];
@@ -100,7 +109,6 @@ int once(){//Ò»´ÎÒÅ´«Ëã·¨
 
 	return result;
 }
-
 
 DWORD WINAPI original_main(LPVOID pPararneter){//Ô­ÏÈµÄÒ»´Îmainº¯Êı,ÏÖÔÚ¸ÄÎªÒ»Ïß³Ì 
 	//³õÊ¼»¯Ê±¼äÏà¹ØĞÅÏ¢
@@ -131,11 +139,9 @@ DWORD WINAPI original_main(LPVOID pPararneter){//Ô­ÏÈµÄÒ»´Îmainº¯Êı,ÏÖÔÚ¸ÄÎªÒ»Ïß
 }
 
 int main(){
-
 	//Ä¬ÈÏÖØ¶¨ÏòÊäÈëÖÁinput.txt£¬Èç¹ûĞèÒªÊÖ¶¯ÊäÈëÇë×¢ÊÍ¸ÃĞĞ»òÕßĞŞ¸ÄÊäÈëÎÄ¼ş
 	// freopen("output.txt","w",stdout);
-	freopen("input.txt", "r", stdin);
-
+	int i,j,k;
 	LoadInstance();
 	
 	clock_t start,finish;
@@ -151,11 +157,11 @@ int main(){
 	hMutex=CreateMutex(NULL,FALSE,NULL);
 	hThread1=CreateThread(NULL,0,original_main,NULL ,0,NULL);
 	Sleep(1000);//¸Ä±ä×÷ÎªËæ»úÊıÖÖ×ÓµÄÊ±¼ä 
-//	hThread2=CreateThread(NULL,0,original_main,NULL ,0,NULL);
-//	Sleep(1000);
-//	hThread3=CreateThread(NULL,0,original_main,NULL ,0,NULL);
-//	Sleep(1000);
-//	hThread4=CreateThread(NULL,0,original_main,NULL ,0,NULL);
+	// hThread2=CreateThread(NULL,0,original_main,NULL ,0,NULL);
+	// Sleep(1000);
+	// hThread3=CreateThread(NULL,0,original_main,NULL ,0,NULL);
+	// Sleep(1000);
+	// hThread4=CreateThread(NULL,0,original_main,NULL ,0,NULL);
 	
 	CloseHandle(hThread1);
 	// CloseHandle(hThread2);
@@ -167,13 +173,69 @@ int main(){
 	finish = clock();
 	duration = (double)(finish-start)/CLOCKS_PER_SEC;
 	
-	//Êä³ö½á¹û
-	FormatSolution_and_display(final_s,final_Ct,1);
+	//Êä³ö¼ìĞŞÇ°½á¹û
+	freopen("output.txt", "w", stdout);//ÖØ¶¨Ïò
+	FormatSovelution_and_display(final_s,final_Ct,1);
 	printf("Time Used:%.3lf\n",duration);
 	printf("End Time:%d\n",final_result);
+	freopen("CON", "w", stdout);//»Øµ½¿ØÖÆÌ¨
+	
+	
+	//ÔÚ¿ØÖÆÌ¨¼ìÑé½á¹û
+	FormatSovelution_and_display(final_s,final_Ct,1);
+	printf("Time Used:%.3lf\n",duration);
+	printf("End Time:%d\n",final_result);
+	 
+	
+	//¼ìĞŞ¹ı³Ì
+	printf("The result had been outputed into output.txt.Please enter num 1 to overhaul.\n");//¿ÉÄÜÑéÊÕµÄÊ±ºòÕâÀïÒªÔİÍ£ 
+	overhaul_list = (int **)malloc(sizeof(int*)*(n*m));//¼ÙÉèÒ»¹²n*mÌõ¼ìĞŞÃüÁî
+	for(i = 0;i<n*m;i++){
+		overhaul_list[i] = (int*)malloc(sizeof(int)*3);//Ã¿Ìõ¼ìĞŞÃüÁî´¢´æÈı¸öĞÅÏ¢¡£¸Ã¼ìĞŞÃüÁîµÄ»úÆ÷¡¢¿ªÊ¼Ê±¼ä£¬½áÊøÊ±¼ä
+		memset(overhaul_list[i],-1,sizeof(int)*3);//-1±íÊ¾²»´æÔÚÕâ¸öÒªÇó
+	}
+	
+	HANDLE OVERHAUL_INPUT,OVERHAUL_OUTPUT;
+	OVERHAUL_INPUT = CreateThread(NULL,0,overhaul_input,NULL,0,NULL);
+	OVERHAUL_OUTPUT = CreateThread(NULL,0,overhaul_output,NULL,0,NULL);
+
+	while(TIME != -1)Sleep(1000);//¼ìĞŞÊÇ·ñ½áÊø
+
+	//Êä³ö¼ìĞŞºó½á¹û
+	freopen("output2.txt", "w", stdout);//ÖØ¶¨Ïò
+		for(i=0;i<m;i++){//µÚiÌ¨»úÆ÷
+			printf("M%d",i);
+			for(j=0;j<n;j++){//µÚj¸ö¹¤Ğò
+				printf(" (%d,%d-%d,%d)",result[i][j][2],result[i][j][0],result[i][j][1],result[i][j][3]);
+			}
+			printf("\n");
+		}		
+	printf("Time Used:%.3lf\n",duration);
+	printf("End Time:%d\n",final_result);
+	freopen("CON", "w", stdout);//»Øµ½¿ØÖÆÌ¨
+	printf("The result had been outputed into output2.txt.\n");
+	
+	//ÔÚ¿ØÖÆÌ¨¼ìÑé½á¹û
+		for(i=0;i<m;i++){//µÚiÌ¨»úÆ÷
+			printf("M%d",i);
+			for(j=0;j<n;j++){//µÚj¸ö¹¤Ğò
+
+				// ²âÊÔ´úÂë£º
+				 if(j>0){//ÁÙÊ±²âÊÔ£º¼ìÑéÓĞÎŞ³åÍ»
+				 	if(result[i][j][2]<result[i][j-1][3]) printf("¨€¨€ERROR¨€¨€");
+				 }
+				//¼ì²é¸Ã¹¤ĞòÓëÉÏÒ»¸ö¹¤ĞòÖ®¼äÊÇ·ñ´æÔÚ¼ìĞŞÃüÁî£¬ÈôÊÇ£¬²åÈë¼ìĞŞĞÅÏ¢
+				insert_overhaul(i,j);
+				printf(" (%d,%d-%d,%d)",result[i][j][2],result[i][j][0],result[i][j][1],result[i][j][3]);
+			}
+			printf("\n");
+		}		
+	printf("Time Used:%.3lf\n",duration);
+	printf("End Time:%d\n",final_result);
+	 
+	
 	
 	//ÄÚ´æÊÍ·Å
-	int i,j;
 	for (i = 0; i<n; i++) {
 		for (j = 0; j<m; j++) free(I[i][j]);
 		free(I[i]);
@@ -181,6 +243,13 @@ int main(){
 	free(final_s);
 	free(final_Ct);
 	free(I);
+
+	
+	for(i=0;i<m;i++){
+		for(j=0;j<n;j++) free(result[i][j]);
+		free(result[i]);
+	}
+	free(result);
 
 	return 0;
 }
@@ -193,6 +262,8 @@ void LoadInstance(){
 	I[i][j][1] ±íÊ¾µÚi¸ö¹¤¼şµÚj¸ö¹¤ĞòËùĞèÒªµÄÊ±¼ä,ÈôÖµÎª0£¬ËµÃ÷²»´æÔÚÕâ¸ö¹¤Ğò
 	i,j¶¼´ÓÍ·¿ªÊ¼¼ÆËã 
 	*/
+
+	freopen("input.txt", "r", stdin);//ÖØ¶¨Ïò
 
 	int i, j, k;//Ñ­»·¸¨Öú±äÁ¿
 	scanf("%d %d", &n, &m);
@@ -211,7 +282,9 @@ void LoadInstance(){
 			scanf("%d",&I[i][j][0]);
 			scanf("%d",&I[i][j][1]);
 			}	
-		}
+	}
+
+	freopen("CON", "r", stdin);//»Øµ½¿ØÖÆÌ¨
 	//ÄÚ´æÊÍ·Å:IÔÚÖ÷º¯Êıfree
 }
 /********************************* 1-INPUT-END *************************************/
@@ -456,9 +529,6 @@ void Mutation(int * p){
 }
 
 /********************************* 4-Crossover-END*************************************/ 
-
-
-
 /********************************* 5-iterator *************************************/ 
 void shufflepop(int * eachtime,int ** pop){
 	int i;
@@ -580,7 +650,7 @@ int iterator(int ** pop,int * eachtime,int * Ct){
 
 /********************************* 5-iterator-END *************************************/ 
 /********************************* 6-Output *************************************/ 
-void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹¤Ğò.choiceÎª1,Êä³ö¹¤Ğò
+void FormatSovelution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹¤Ğò.choiceÎª1,Êä³ö¹¤Ğò
 
 	ComputeStartTimes(s,Ct);//ÔÙËãÒ»´Î,Ë¢ĞÂCt.º¯ÊıÉè¼ÆÊ§Îó,²»Ó¦¸ÃÓÃÈ«¾Ö±äÁ¿µÄ.²»¹ı¿¼ÂÇµ½Ò»´Î³ÌĞòÖ»ËãÒ»´Î,ºöÂÔ²»¼ÆÁË. //Ô­ÒòÎ´ÖªµÄbug
 
@@ -602,7 +672,7 @@ void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹
         T[j] = T[j] + 1;
     }
 	
-	int *** result = (int ***)malloc(sizeof(int**)*m);
+	result = (int ***)malloc(sizeof(int**)*m);
 	for(i=0;i<m;i++){//µÚiÌ¨»úÆ÷
 		result[i] = (int **)malloc(sizeof(int*)*n);
 		for(j=0;j<n;j++){//µÚiÌ¨»úÆ÷µÄµÚj¸ö¹¤Ğò
@@ -640,40 +710,224 @@ void FormatSolution_and_display(int * s,int * Ct,int choice){//choiceÎª0:²»Êä³ö¹
 		}
 	}
 
+
 	if(choice){
-		for(i=0;i<m;i++){
-			printf("M%d ",i);
-			for(j=0;j<n;j++){
-				
-				// ²âÊÔ´úÂë£º
-				// if(j>0){//ÁÙÊ±²âÊÔ£º¼ìÑéÓĞÎŞ³åÍ»
-				// 	if(result[i][j][2]<result[i][j-1][3]) printf("¨€¨€ERROR¨€¨€");
-				// }
-
-				printf("(%d,%d-%d,%d) ",result[i][j][2],result[i][j][0]+1,result[i][j][1]+1,result[i][j][3]);
-
-			}
+		for(i=0;i<m;i++){//µÚiÌ¨»úÆ÷
+			printf("M%d",i);
+			for(j=0;j<n;j++)//µÚj¸ö¹¤Ğò
+				printf(" (%d,%d-%d,%d)",result[i][j][2],result[i][j][0],result[i][j][1],result[i][j][3]);
 			printf("\n");
 		}		
 	}
-
 
 	//ÄÚ´æÊÍ·Å
 	free(T);
 	
     for(i=0;i<n;i++) free(S[i]);
     free(S);
-    
-	for(i=0;i<m;i++){
-		for(j=0;j<n;j++) free(result[i][j]);
-		free(result[i]);
-	}
-	free(result);
 } 
 /********************************* 6-Output-END *************************************/ 
+/********************************* 7-overhaul *************************************/ 
 
+int checkstate(int aimm,int time){//·µ»Ø»úÆ÷ÔÚtimeÊ±¿ÌµÄ×´Ì¬.0±íÊ¾¿ÕÏĞ£¬1±íÊ¾¹¤×÷£¬2±íÊ¾¼ìĞŞ
+	int i,j,k;
+	//¼ì²éÊÇ·ñÔÚ¼ìĞŞ×´Ì¬£º±éÀúoverhaul_list
+	for(i=0;i<m*n;i++){
+		if(overhaul_list[i][0] == -1) break;
+		if(overhaul_list[i][0] == aimm){
+			if(time>=overhaul_list[i][1] && time<=overhaul_list[i][2]) return 2;
+		}		
+	}
+	
+	//¼ì²éÊÇ·ñÔÚ¹¤×÷×´Ì¬
+	for(j=0;j<n;j++){
+		if(time >= result[aimm][j][2] && time <= result[aimm][j][3]) return 1;
+	}
+	
+	return 0;
+}
+
+void putforward(int aimi,int aimj){
+	int i,j;
+	//¼ì²éÇ°·½ÓĞÎŞ¿ÕÏĞÊ±¼ä
+	if((aimj!=0 && result[aimi][aimj][2] > result[aimi][aimj-1][3] )|| aimj==0){
+
+		int name = result[aimi][aimj][0];
+		int order = result[aimi][aimj][1];
+
+		int duration;
+		
+		//Á½¸öÌØÅĞ 
+		if(aimj==0){//ÊÇÕû¸ö»úÆ÷µÄµÚ0¸ö¹¤Ğò£¬µ«²»ÊÇ¸Ã¹¤¼şµÄµÚ0¸ö¹¤Ğò 
+			if(result[aimi][aimj][1]!=0) return;
+			
+			duration = result[aimi][aimj][2];
+			result[aimi][aimj][2] -= duration;
+			result[aimi][aimj][3] -= duration;
+			return;
+		}
+
+		if(order==0){//ÊÇÕû¸ö¹¤¼şµÄµÚ0¸ö¹¤Ğò//ÎÒÎªÊ²Ã´ÒªĞ´Õâ¶Î£¿ 
+			duration = result[aimi][aimj][2]-result[aimi][aimj-1][3];
+			result[aimi][aimj][2] -= duration;
+			result[aimi][aimj][3] -= duration;
+			return;
+		}
+			
+
+		//¼ì²éÇ°·½¿ÕÏĞÊ±¼äÊÇ·ñÊÇ¼ìĞŞÊ±¼ä
+		for(i=0;i<n*m;i++){//´Ë´¦¿ÉÓÅ»¯£¬µ«ÒâÒå²»´óÁË¡£Èç¹ûÓöµ½ÓĞ¼ìĞŞÒªÇó£¬Ö±½ÓÌø¹ı²»Ç°ÍÆ
+			if(overhaul_list[i][0] == aimi && overhaul_list[i][1] >= result[aimi][aimj-1][3] && overhaul_list[i][2] <= result[aimi][aimj][2]) return;
+		}
+
+		//¼ÈÈ»ÖĞ¼ä¶ÎÃ»ÓĞ¼ìĞŞĞèÇó£¬ÄÇÃ´£¬¿¼²ì¸Ã¹¤¼şµÄÉÏÒ»¸ö¹¤ĞòµÄ½áÊøÊ±¼ä
+		for(i=0;i<m;i++){
+			for(j=0;j<n;j++){
+				if(result[i][j][0] == name && result[i][j][1] == (order-1)){//±éÀúÕÒµ½ËûµÄÉÏÒ»¸ö¹¤¼ş
+					//¶ÔÆë¸Ã»úÆ÷ÉÏÒ»¸ö¹¤ĞòµÄ½áÊøÊ±¼äºÍ¸Ã¹¤¼şÉÏÒ»¸ö¹¤ĞòµÄ½áÊøÊ±¼äµÄ×î´óÖµ
+					int max;
+					if(result[i][j][3] > result[aimi][aimj-1][3]) max = result[i][j][3];
+					else max = result[aimi][aimj-1][3];
+
+					//¼ÆËãÇ°ÍÆÊ±³¤
+					int duration = result[aimi][aimj][2] -  max;
+					result[aimi][aimj][2] -= duration;
+					result[aimi][aimj][3] -= duration;
+					
+					break;
+				}
+			}
+		}
+	}
+}
+
+DWORD WINAPI overhaul_output(LPVOID pPararneter){//¸ºÔğÏÔÊ¾ÓëÊ±¼ä
+	int i,j,k;
+
+	clock_t start,finish;
+	start = clock();
+
+	int mutiple = 100;//ÖÆ¶¨¼Ó¹¤Ê±¼ä±È
+
+
+	while(  ((int)(clock()-start)/CLOCKS_PER_SEC)*mutiple  <final_result){
+		TIME = ((int)(clock()-start)/CLOCKS_PER_SEC)*mutiple;
+
+		for(i=0;i<m;i++){
+			//ÕÒµ½µ±Ç°TIMEËù¶ÔÓ¦µÄj
+			for(j=0;j<n;j++){
+				if( result[i][j][2] >= TIME ) break;
+			} 
+			
+			if(j>0) j--;
+			printf("%d %d ",TIME,i);
+			
+			int state = checkstate(i,TIME);
+
+			if(state==2) printf("¼ìĞŞ\n");//ÔÚ¼ìĞŞ×´Ì¬
+			else{
+				if(state==1) {
+					printf("¼Ó¹¤ ");//¼Ó¹¤×´Ì¬ 
+					printf("%d-%d %d %d\n",result[i][j][0],result[i][j][1],TIME-result[i][j][2],result[i][j][3]-result[i][j][2]);
+				}
+				else printf("¿ÕÏĞ\n");//¿ÕÏĞ×´Ì¬
+			}
+		}
+
+		Sleep(3*1000);//Í£4Ãë£¬²»È»ÄãÒÔÎªÄãÊÇÊÖËÙÏÀÃ´ 
+		printf("\n");
+			
+	}
+	TIME = -1;//ÉèÖÃÍË³ö 
+}
+
+DWORD WINAPI overhaul_input(LPVOID pPararneter){//²»½ö½öÊÇÊäÈë£¬¹¦ÄÜ»¹°üÀ¨Éú³É¼ìĞŞĞòÁĞ¡¢ºóÍË¡¢Ç°ÍÆµÈÒ»ÏµÁĞÊä³öÃ»ÓĞµÄ¹¦ÄÜ
+	int i,j,k,t=0;//ÆäÖĞ,tÌØ±ğÓÃÀ´¼ÇÂ¼ÕâÊÇµÚt¸ö¼ìĞŞÒªÇó
+	int aimm,lasttime;
+
+	while(TIME<final_result){
+		scanf("%d",&aimm);
+		scanf("%d",&lasttime);
+		printf("¼ìĞŞÒªÇóÂ¼Èë³É¹¦£¡\n"); 
+		overhaul_list[t][0] = aimm;
+
+		//¼ì²éÄ¿±ê»úÆ÷µÄ×´Ì¬£¬Éú³É¼ìĞŞÒªÇó
+		int state = checkstate(aimm,TIME);
+		if(state==2){//¼ìĞŞ×´Ì¬×·¼Óµ½¼ìĞŞ½áÊøÊ±¼ä
+			for(i<0;i<t;i++){
+				if(overhaul_list[i][0] == aimm && TIME >= overhaul_list[i][1] && TIME <= overhaul_list[i][2]){//¶à¼ÓÅĞ¶Ï£¬¿ÉÄÜ´æÔÚÒ»¸ö»úÆ÷¶à´Î¼ìĞŞµÄÀı×Ó
+					overhaul_list[t][1] = overhaul_list[i][2];
+					overhaul_list[t][2] = overhaul_list[i][2] + lasttime;
+					break;
+				}
+			}
+		}
+		
+		else if(state==1){//¹¤×÷×´Ì¬½«¼ìĞŞ¹ı³Ì×·¼Óµ½¹¤×÷½áÊøÊ±¼ä
+			//Ñ°ÕÒ¹¤¼ş½áÊøÊ±¼ä
+			for(j=0;j<n;j++){
+				if(TIME >= result[aimm][j][2] && TIME <= result[aimm][j][3]){
+					overhaul_list[t][1] = result[aimm][j][3];
+					overhaul_list[t][2] = result[aimm][j][3] + lasttime;
+					break;
+				}
+			}
+		}
+		else{//¿ÕÏĞ×´Ì¬Ö±½ÓÔÚµ±Ç°×´Ì¬½øÈë¼ìĞŞ¹ı³Ì
+			overhaul_list[t][1] = TIME;
+			overhaul_list[t][2] = TIME + lasttime; 	
+		}
+
+		//¼ìĞŞÁĞÉú³ÉÍê±Ï£¬ÏÖÔÚ½øĞĞÈ«ÌåºóÍË¡£ËùÓĞ¿ªÊ¼Ê±¼äÂäºóÓÚ¼ìĞŞÊ±¼ä¿ªÊ¼Ê±¼äµÄ¹¤¼şÍ³Ò»£¬Í³Ò»¼ÓÉÏ¼ìĞŞÊ±³¤
+		for(i=0;i<m;i++){
+			for(j=0;j<n;j++){
+				if(result[i][j][2] >= overhaul_list[t][1]){
+					result[i][j][2] += lasttime;
+					result[i][j][3] += lasttime;
+				}
+			}
+		}
+		
+		//È«ÌåºóÍËÍê±Ï£¬ÏÖÔÚ½øĞĞÇ°ÍÆ
+		for(k=0;k<n*m*2;k++){//Ñ­»·¶à´Î£¬ÒòÎª»á³öÏÖµ±Ç°±¾¿ÉÒÔÇ°ÍÆµÄ¹¤¼şÊÜ»¹Î´Ç°ÍÆµÄ¹¤¼şµÄÖÆÔ¼¡£ÖÁÓÚÎªÊ²Ã´ÊÇn*m*2´Î£¬ÂÒĞ´µÄ¡£
+			for(i=0;i<m;i++){
+				for(j=0;j<n;j++){
+					putforward(i,j);
+				}
+			}
+		}
+
+		//¶¯Ì¬Ë¢ĞÂfinal_result
+		for(i=0;i<m;i++) if(result[i][n-1][3] > final_result) final_result = result[i][n-1][3];
+
+		
+		
+		//ÖÁ´Ë£¬Îª¼ÓÈëµ±Ç°¼ìĞŞÒªÇóÏÂµÄ×îÓÅ½â
+		t++;
+	}
+}
+void insert_overhaul(int aimi,int aimj){
+	//ÏÈ»ñÈ¡¸Ã¹¤ĞòµÄ¿ªÊ¼Ê±¼äÓëÉÏÒ»¸ö¹¤ĞòµÄ½áÊøÊ±¼ä,·Ö±ğ¼ÇÎªÇø¼äµÄ¿ªÊ¼Óë½áÊø
+	int start,end;
+	if(aimj==0){
+		start = 0;
+		end = result[aimi][aimj][2];
+	}
+	else{
+		start = result[aimi][aimj-1][3];
+		end = result[aimi][aimj][2];
+	}
+
+	//±éÀú¼ìĞŞÇëÇóÁĞ±í,²é¿´ÓĞÎŞÂäÓÚ¸ÃÇø¼äµÄ¼ìĞŞÇëÇó£¬Êä³ö¸ÃÇø¼äÄÚµÄËùÓĞ¼ìĞŞÇëÇó
+	int i,j,k;
+	for(i=0;i<n*m;i++){
+		if(overhaul_list[i][0]==-1)break;
+		if(overhaul_list[i][1]>=start && overhaul_list[i][2]<= end && overhaul_list[i][0] == aimi) printf(" (%d,¼ìĞŞ,%d)",overhaul_list[i][1],overhaul_list[i][2]);
+	}
+
+}
+/********************************* 7-overhaul-end*************************************/ 
 /********************************* 7-observer-(É¾È¥²»Ó°Ïì´úÂë¹¦ÄÜ) *************************************/ 
-
 void printfIndex(int ** idx){
 	int i;
 	printf("Parent:");
@@ -722,4 +976,7 @@ void printfpop(int ** pop,int * eachtime){
 		printf("\n");
 	}
 }
+
 /********************************* 7-observer-END *************************************/ 
+
+
