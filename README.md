@@ -4,7 +4,7 @@ Fisrt thing first-This project was finally finished at the middle of the June,20
 And,**first thing.If you are also a freshman of bupt,please accomplish the task indpendently. :)**
 
 ## Specification
-All the codes included GUI were contained in the folder jobshop_vs2012.If you just want to if it could be ran rightly or not you can just check GA_Jobshop.c in the root.
+All the codes included GUI were contained in the folder jobshop_vs2012.If you just want to if it could be ran rightly or not you can just check GA_Jobshop.c in the root.And sorry for that since the compiler on my PC dosen't work well, I couldn't initialize the i,j,k,the temp variable, in the 'for' circulation. So I just intialize all of them in the begining of each function.
 The reference contained the paper and the data we used.
 The test_data contained, emmm, you know,the data for testing.
 
