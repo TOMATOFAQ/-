@@ -1,4 +1,4 @@
-# A homework of bupt
+# A homework for program design
 Fisrt thing first-This project was finally finished at the middle of the June,2018 by @Seyuko ,THE-ONE-BROTHER and me. And without question, We got A+ in this course. I express my greatest gratitude to my partner especially Seyuko not only for supporting such a fantastic GUI, but also for the joyful teamwork about conquering this task.
 
 And,**first thing.If you are also a freshman of bupt,please accomplish the task indpendently. :)**
